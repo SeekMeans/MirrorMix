@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="theme-color" content="#f1f2f4" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#13171e" media="(prefers-color-scheme: dark)" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <title>MirrorMix</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <script>
+      // 设置 → 外观, applied before the page draws so it does not flash the other look.
+      try {
+        var theme = localStorage.getItem("mirrormix.theme");
+        if (theme === "light" || theme === "dark") {
+          document.documentElement.dataset.theme = theme;
+          var bar = theme === "dark" ? "#13171e" : "#f1f2f4";
+          document.querySelectorAll('meta[name="theme-color"]').forEach(function (meta) { meta.content = bar; });
+        }
+      } catch (error) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,13 @@
+# 放到 /etc/systemd/system/frps.service
+[Unit]
+Description=frps for tnndworlds
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/opt/software/frp_0.61.0_linux_amd64/frps -c /opt/software/frp_0.61.0_linux_amd64/frps.toml
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
