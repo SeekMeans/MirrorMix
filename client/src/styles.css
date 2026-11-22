@@ -2487,7 +2487,7 @@ body.is-resizing-x iframe { pointer-events: none; }
 
 .settings-page .settings-head {
   padding: calc(16px + env(safe-area-inset-top)) 18px 14px;
-  background: var(--rail);
+  background: var(--page);
   border-bottom: 1px solid var(--line);
 }
 
