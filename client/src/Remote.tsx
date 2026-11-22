@@ -52,6 +52,28 @@ export function RemotePanel() {
     }
   }, []);
 
+  const [retrying, setRetrying] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  const retryAt = view?.status.retryAt;
+  useEffect(() => {
+    if (!retryAt) return;
+    const tick = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(tick);
+  }, [retryAt]);
+
+  /** Connects again at once instead of waiting for the next automatic try. */
+  const retryNow = async () => {
+    setRetrying(true);
+    setError("");
+    try {
+      setView(await api.retryRemote());
+    } catch (failure) {
+      setError(errorText((failure as { code?: string }).code));
+    } finally {
+      setRetrying(false);
+    }
+  };
+
   // The connection state changes on its own, so it is read again every two seconds while this is open.
   useEffect(() => {
     void load();
@@ -175,6 +197,20 @@ export function RemotePanel() {
         )}
         {view.enabled && pending && url && <p className="remote-message">子域名改过了，保存后这个地址才生效。</p>}
         {view.enabled && message && <p className="remote-message">{message}</p>}
+        {/* Not connected: it tries again by itself after a growing wait, and can be told to try now. */}
+        {view.enabled && state === "error" && (
+          <div className="remote-retry">
+            <span>
+              {view.status.retryAt && view.status.retryAt > now
+                ? `${Math.max(1, Math.ceil((view.status.retryAt - now) / 1000))} 秒后自动重试`
+                : "可以手动重试"}
+            </span>
+            <button type="button" className="quiet-button" disabled={retrying || saving} onClick={() => void retryNow()}>
+              {retrying ? <Spinner /> : null}
+              {retrying ? "正在重试" : "立即重试"}
+            </button>
+          </div>
+        )}
         {!view.enabled && (
           <p className="remote-message">
             打开后填写子域名和连接口令，两项都在 MirrorMix 小程序里开通地址后显示。MirrorMix 会在后台运行 frpc，通过服务器把这台电脑放到 子域名.{domain} 上，MirrorMix 退出时一起停止。

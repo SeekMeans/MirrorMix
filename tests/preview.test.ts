@@ -50,6 +50,23 @@ describe("preview relay", () => {
     preview.server.close();
   });
 
+  it("reaches a dev server that listens on IPv6 localhost only ([::1])", async () => {
+    const page = http.createServer((request, response) => {
+      response.writeHead(200, { "content-type": "text/plain" });
+      response.end(`v6 page ${request.url}`);
+    });
+    const pagePort = await new Promise<number>((resolve) => page.listen(0, "::1", () => resolve((page.address() as AddressInfo).port)));
+    const preview = createPreview({ port: 0, blocked: [] });
+    const previewPort = await listen(preview.server);
+    const entered = await fetch(`http://127.0.0.1:${previewPort}${preview.issue(pagePort)}`, { redirect: "manual" });
+    const cookie = (entered.headers.get("set-cookie") ?? "").split(";")[0];
+    const answer = await fetch(`http://127.0.0.1:${previewPort}/app`, { headers: { cookie } });
+    expect(answer.status).toBe(200);
+    expect(await answer.text()).toBe("v6 page /app");
+    page.close();
+    preview.server.close();
+  });
+
   it("says so when nothing is running on that port", async () => {
     const preview = createPreview({ port: 0, blocked: [] });
     const previewPort = await listen(preview.server);

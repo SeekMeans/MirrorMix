@@ -118,6 +118,10 @@ describe("frpc settings", () => {
     expect(readFrpcLine("[E] login to the server failed: invalid user or token")?.message).toMatch(/小程序/);
     expect(readFrpcLine("[W] [office.mirrormix-home] start error: subdomain not granted to this user")?.message).toMatch(/没有分配/);
     expect(readFrpcLine("[W] connect to server error: dial tcp 1.2.3.4:7000: connectex: No connection could be made")?.message).toMatch(/连不上/);
+    // Seen for real: login works, but frps still holds the proxy from another connection.
+    expect(
+      readFrpcLine("2026-11-21 22:09:13.739 [W] [client/control.go:166] [fb40a2fad6669b94] [chengsongsong.mirrormix-chengsongsong] start error: proxy [chengsongsong.mirrormix-chengsongsong] already exists"),
+    ).toMatchObject({ state: "error", message: expect.stringMatching(/另一条连接占用/) });
     expect(readFrpcLine("[I] some unrelated line")).toBeNull();
   });
 });
@@ -196,6 +200,53 @@ describe("tunnel", () => {
     expect(tunnel.view().status.state).toBe("error");
     await new Promise((resolve) => setTimeout(resolve, 30));
     expect(runs).toHaveLength(2);
+    tunnel.dispose();
+  });
+
+  it("starts frpc afresh when it keeps running but is stuck on an error, and says when it will", async () => {
+    const { tunnel, runs } = setup();
+    tunnel.update({ ...filled(), enabled: true });
+    expect(runs).toHaveLength(1);
+    // frpc stays up but its proxy was refused; it will not register again by itself.
+    runs[0].say("[W] [mirrormix-office] start error: subdomain [office] is already used");
+    const stuck = tunnel.view().status;
+    expect(stuck.state).toBe("error");
+    expect(stuck.retryAt).toBeGreaterThan(Date.now() - 1);
+    // More error lines while waiting do not stack up more retries.
+    runs[0].say("[W] connect to server error: dial tcp: connectex");
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(runs).toHaveLength(2);
+    expect(runs[0].killed).toBe(true);
+    // Once connected there is nothing to retry.
+    runs[1].say("[I] [mirrormix-office] start proxy success");
+    expect(tunnel.view().status).toMatchObject({ state: "connected" });
+    expect(tunnel.view().status.retryAt).toBeUndefined();
+    tunnel.dispose();
+  });
+
+  it("connects again at once when asked, instead of waiting for the next try", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "aimiss-remote-retry-"));
+    const frpc = path.join(dir, "frpc.exe");
+    writeFileSync(frpc, "");
+    const fake = fakeFrpc();
+    const tunnel = createTunnel({
+      dir,
+      localPort: 4789,
+      spawn: fake.spawn,
+      bundledFrpc: frpc,
+      seal: (secret) => `sealed:${secret}`,
+      unseal: (sealed) => sealed.replace(/^sealed:/, ""),
+      // A long wait, so only the button can bring the next try.
+      retryMs: () => 60_000,
+    });
+    tunnel.update({ ...filled(), enabled: true });
+    fake.runs[0].say("[W] connect to server error: dial tcp 1.2.3.4:7000: connectex: No connection could be made");
+    expect(tunnel.view().status.retryAt).toBeGreaterThan(Date.now() + 30_000);
+    const view = tunnel.retryNow();
+    expect(fake.runs).toHaveLength(2);
+    expect(fake.runs[0].killed).toBe(true);
+    expect(view.status.state).toBe("starting");
+    expect(view.status.retryAt).toBeUndefined();
     tunnel.dispose();
   });
 

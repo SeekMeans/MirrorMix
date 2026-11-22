@@ -163,7 +163,8 @@ export interface RemoteView extends RemoteConfig {
   domain: string;
   configFile: string;
   hasToken: boolean;
-  status: { state: "off" | "starting" | "connected" | "error"; message: string; url: string };
+  /** `retryAt`: when the server tries again by itself (ms since 1970), while it is not connected. */
+  status: { state: "off" | "starting" | "connected" | "error"; message: string; url: string; retryAt?: number };
 }
 
 export const AUTH_EXPIRED = "mirrormix:auth-expired";
@@ -379,6 +380,7 @@ export const api = {
   remote: () => request<RemoteView>("/api/remote"),
   /** The saved connection token in plain text, for the eye button only. */
   remoteToken: () => request<{ token: string }>("/api/remote/token"),
+  retryRemote: () => request<RemoteView>("/api/remote/retry", { method: "POST" }),
   saveRemote: (change: Partial<RemoteConfig> & { token?: string }) =>
     request<RemoteView>("/api/remote", { method: "PUT", body: JSON.stringify(change) }),
   page: (tool: ToolId, id: string, before: number, limit: number) =>

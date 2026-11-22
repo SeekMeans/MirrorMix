@@ -334,6 +334,9 @@ export function createApp(
         response.setHeader("Cache-Control", "no-store");
         return sendJson(response, 200, { token: remote.token() ?? "" });
       }
+      if (remote && request.method === "POST" && url.pathname === "/api/remote/retry") {
+        return sendJson(response, 200, remote.retryNow());
+      }
       if (remote && url.pathname === "/api/remote") {
         if (request.method === "GET") return sendJson(response, 200, remote.view());
         if (request.method === "PUT") {

@@ -4312,6 +4312,8 @@ button.pref-row:active { background: var(--rail); }
   border: 0;
   border-bottom: 1px solid var(--rail-line, var(--line));
   border-radius: 0;
+  /* No panel of its own: it sits on the page, and the line below separates it from the settings. */
+  background: transparent;
 }
 
 /* Phone rows that lead with a tool mark: room between the selected line and the mark. */
@@ -4426,3 +4428,8 @@ button.pref-row:active { background: var(--rail); }
 .is-mobile .today.is-card .today-figures div { flex: 1 1 auto; min-width: 0; padding: 0 9px; }
 .is-mobile .today.is-card .today-figures div:first-child { padding-left: 0; }
 .is-mobile .today.is-card .today-figures div:last-child { padding-right: 0; }
+
+/* 外网访问 not connected: when it tries again by itself, and a button to try now. */
+.remote-retry { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.remote-retry .quiet-button { flex: none; gap: 6px; }
+.is-mobile .remote-retry .quiet-button { height: 40px; padding: 0 14px; }

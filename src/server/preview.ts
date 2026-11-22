@@ -13,7 +13,8 @@ import path from "node:path";
  * under a prefix like /preview/5173/ every one of those would miss. Here the page sits at the root of its own address.
  * Locally that is http://127.0.0.1:<preview port>; through the tunnel it is its own subdomain.
  *
- * It only ever forwards to 127.0.0.1, so it cannot be used to reach other machines. A browser gets in with a
+ * It only ever forwards to this machine's loopback (127.0.0.1, or [::1] for servers that listen there only), so it cannot
+ * be used to reach other machines. A browser gets in with a
  * one-time ticket that the signed-in MirrorMix page asks for; the ticket becomes a cookie that also says which port.
  */
 
@@ -57,6 +58,35 @@ function withoutOurCookie(header: string | string[] | undefined): string | undef
 function overHttps(request: http.IncomingMessage): boolean {
   const proto = request.headers["x-forwarded-proto"];
   return (Array.isArray(proto) ? proto[0] : proto)?.split(",")[0]?.trim().toLowerCase() === "https";
+}
+
+/**
+ * Which loopback a port answers on. Dev servers that bind "localhost" often listen on IPv6 only ([::1]), where
+ * 127.0.0.1 is refused. Tried in that order and remembered for a short while, so each request does not probe again.
+ */
+type Loopback = "127.0.0.1" | "::1";
+const loopbackSeen = new Map<number, { address: Loopback; at: number }>();
+const LOOPBACK_MEMORY_MS = 10_000;
+
+function answers(port: number, address: Loopback): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = net.connect({ port, host: address });
+    const done = (ok: boolean) => {
+      socket.destroy();
+      resolve(ok);
+    };
+    socket.setTimeout(1500, () => done(false));
+    socket.once("connect", () => done(true));
+    socket.once("error", () => done(false));
+  });
+}
+
+export async function loopbackFor(port: number, now = Date.now()): Promise<Loopback> {
+  const seen = loopbackSeen.get(port);
+  if (seen && now - seen.at < LOOPBACK_MEMORY_MS) return seen.address;
+  const address: Loopback = (await answers(port, "127.0.0.1")) ? "127.0.0.1" : (await answers(port, "::1")) ? "::1" : "127.0.0.1";
+  loopbackSeen.set(port, { address, at: now });
+  return address;
 }
 
 /** "http://localhost:5173/x" from the page behind becomes "/x", so a redirect stays on this address. */
@@ -134,8 +164,10 @@ export function createPreview(deps: PreviewDeps) {
     if (!found) return page(response, 401, "需要从 MirrorMix 打开", "这个地址用来查看这台电脑上的网页。请在 MirrorMix 里点浏览器图标，选择要看的文件或端口。");
     if ("root" in found.target) return serveFile(found.target.root, url.pathname, request, response);
     const pass = { port: found.target.port };
+    // Held until the loopback is known; the body waits in the request stream meanwhile.
+    void loopbackFor(pass.port).then((host) => {
     const upstream = http.request(
-      { host: "127.0.0.1", port: pass.port, method: request.method, path: request.url, headers: upstreamHeaders(request, pass.port) },
+      { host, port: pass.port, method: request.method, path: request.url, headers: upstreamHeaders(request, pass.port) },
       (answer) => {
         const headers = { ...answer.headers };
         if (typeof headers.location === "string") headers.location = localRedirect(headers.location, pass.port);
@@ -151,6 +183,7 @@ export function createPreview(deps: PreviewDeps) {
       page(response, 502, `localhost:${pass.port} 没有响应`, `这台电脑上 ${pass.port} 端口没有在运行网页，或者已经停了。启动它之后刷新这一页。`);
     });
     request.pipe(upstream);
+    });
   });
 
   // Hot reload and other live pages talk over WebSocket. The upgrade is passed through as raw bytes.
@@ -161,7 +194,8 @@ export function createPreview(deps: PreviewDeps) {
       return;
     }
     const pass = { port: found.target.port };
-    const target = net.connect(pass.port, "127.0.0.1", () => {
+    void loopbackFor(pass.port).then((host) => {
+    const target = net.connect(pass.port, host, () => {
       const lines = [`${request.method} ${request.url} HTTP/1.1`];
       const headers = upstreamHeaders(request, pass.port);
       for (const [name, value] of Object.entries(headers)) {
@@ -180,6 +214,7 @@ export function createPreview(deps: PreviewDeps) {
     socket.on("error", stop);
     target.on("close", () => socket.destroy());
     socket.on("close", () => target.destroy());
+    });
   });
 
   return {

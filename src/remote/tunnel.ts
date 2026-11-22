@@ -33,6 +33,8 @@ export interface RemoteStatus {
   message: string;
   /** The address to open from outside, once a domain and subdomain are set. */
   url: string;
+  /** When MirrorMix tries again on its own (ms since 1970), while it is not connected and a retry is waiting. */
+  retryAt?: number;
 }
 
 export interface RemoteView extends RemoteConfig, RemoteServer {
@@ -205,6 +207,14 @@ export function readFrpcLine(line: string): { state: RemoteState; message: strin
   if (/token|authorization/i.test(text) && /(fail|invalid|mismatch|error)/i.test(text)) {
     return { state: "error", message: "服务器拒绝了连接口令。检查子域名和连接口令是否和 MirrorMix 小程序里显示的一致。" };
   }
+  // frps still has this proxy from another connection: another computer using the same subdomain, or an old link
+  // the server has not noticed is gone. frpc keeps trying, so it connects by itself once that one is released.
+  if (/proxy \[[^\]]*\] already exists/i.test(text)) {
+    return {
+      state: "error",
+      message: "这个子域名正被另一条连接占用：可能是另一台电脑上的 MirrorMix 也用了这个子域名，也可能是服务器上还挂着一条没断开的旧连接。关掉另一台电脑的外网访问，或者等几分钟，这里会自动连上；一直不行就重启服务器上的 frps。",
+    };
+  }
   if (/subdomain/i.test(text) && /(used|exist|conflict)/i.test(text)) {
     return { state: "error", message: "这个子域名已经被另一台电脑占用。换一个子域名。" };
   }
@@ -269,6 +279,8 @@ function realSpawn(file: string, args: string[], env: Record<string, string>): F
 export interface Tunnel {
   view(): RemoteView;
   update(change: RemoteUpdate): RemoteView;
+  /** Connects again at once, without waiting for the next automatic try. */
+  retryNow(): RemoteView;
   /** The public address this PC answers under while the tunnel is on, so the page served there is let in. */
   origin(): string | null;
   /** Where local pages are shown through the tunnel, while it is on. */
@@ -319,6 +331,7 @@ export function createTunnel(deps: TunnelDeps): Tunnel {
   let status: RemoteStatus = { state: "off", message: "", url: urlOf(stored) };
   let child: FrpcProcess | null = null;
   let retry: NodeJS.Timeout | null = null;
+  let retryAt: number | undefined;
   let attempts = 0;
   let generation = 0;
   let forgetRunFile: (() => void) | null = null;
@@ -332,10 +345,24 @@ export function createTunnel(deps: TunnelDeps): Tunnel {
     status = { state, message, url: urlOf(stored) };
   };
 
+  /** Starts again after a wait that grows with each failure (2 s, 4 s, 8 s… up to 30 s). One wait at a time. */
+  const scheduleRetry = (mine: number) => {
+    if (retry) return;
+    const wait = retryMs(attempts);
+    attempts += 1;
+    retryAt = Date.now() + wait;
+    retry = setTimeout(() => {
+      retry = null;
+      retryAt = undefined;
+      if (mine === generation) start();
+    }, wait);
+  };
+
   const stop = () => {
     generation += 1;
     if (retry) clearTimeout(retry);
     retry = null;
+    retryAt = undefined;
     forgetRunFile?.();
     forgetRunFile = null;
     const running = child;
@@ -408,10 +435,16 @@ export function createTunnel(deps: TunnelDeps): Tunnel {
       if (mine !== generation) return;
       const change = readFrpcLine(line);
       if (!change) return;
-      if (change.state === "connected") attempts = 0;
+      if (change.state === "connected") {
+        attempts = 0;
+        if (retry) clearTimeout(retry);
+        retry = null;
+        retryAt = undefined;
+      }
       // A login success says nothing new while already connected.
       if (change.state === "starting" && status.state === "connected") return;
       setStatus(change.state, change.message);
+      if (change.state === "error") scheduleRetry(mine);
     });
     proc.onExit(() => {
       forget();
@@ -422,11 +455,7 @@ export function createTunnel(deps: TunnelDeps): Tunnel {
         return;
       }
       if (status.state !== "error") setStatus("error", "frpc 退出了，正在重新连接。");
-      const wait = retryMs(attempts);
-      attempts += 1;
-      retry = setTimeout(() => {
-        if (mine === generation) start();
-      }, wait);
+      scheduleRetry(mine);
     });
   };
 
@@ -437,8 +466,17 @@ export function createTunnel(deps: TunnelDeps): Tunnel {
       ...shared,
       configFile: deps.configFile ?? "",
       hasToken: Boolean(sealedToken),
-      status: { ...status, url: urlOf(stored) },
+      status: { ...status, url: urlOf(stored), ...(retryAt && status.state !== "connected" ? { retryAt } : {}) },
     };
+  };
+
+  /** Tries again right away (the page's 重试 button), with the waits starting over. */
+  const retryNow = (): RemoteView => {
+    if (stored.enabled) {
+      attempts = 0;
+      start();
+    }
+    return view();
   };
 
   const update = (change: RemoteUpdate): RemoteView => {
@@ -473,6 +511,7 @@ export function createTunnel(deps: TunnelDeps): Tunnel {
   return {
     view,
     update,
+    retryNow,
     origin: () => (stored.enabled ? urlOf(stored) || null : null),
     previewOrigin: () => {
       const name = stored.enabled && deps.previewPort ? previewSubdomain(stored.subdomain) : null;

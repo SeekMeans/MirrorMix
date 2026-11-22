@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-const source = readFileSync(path.join(process.cwd(), "src", "process", "supervisor.ts"), "utf8");
+// Line endings as Git stores them: a Windows checkout may have the file with CRLF.
+const source = readFileSync(path.join(process.cwd(), "src", "process", "supervisor.ts"), "utf8").replace(/\r\n/g, "\n");
 
 describe("Cursor local echo", () => {
   it("pushes the pending message before waiting for Cursor's desktop window", () => {

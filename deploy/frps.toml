@@ -5,15 +5,6 @@
 # 电脑连上来的端口。安全组要放行。
 bindPort = 5000
 
-# 不设共享的 auth.token：每台电脑一个口令，由插件核对。
-# Login 核对口令；NewProxy 只允许 http、只允许自己的子域名和「子域名-preview」；
-# Ping 每次心跳再核一次，地址被收回或口令被重置后，已连着的电脑会被断开。
-[[httpPlugins]]
-name = "mirrormix"
-addr = "127.0.0.1:7200"
-path = "/handler"
-ops = ["Login", "NewProxy", "Ping"]
-
 # DNSMgr 靠它判断电脑是否在线。只听本机，密码换成随机字符串，和 DNSMgr 的 mm_config.json 一致。
 webServer.addr = "127.0.0.1"
 webServer.port = 7500
@@ -28,3 +19,14 @@ transport.tls.force = true
 proxyBindAddr = "127.0.0.1"
 vhostHTTPPort = 8080
 subDomainHost = "mm.seekmeans.cn"
+
+# 不设共享的 auth.token：每台电脑一个口令，由插件核对。
+# Login 核对口令；NewProxy 只允许 http、只允许自己的子域名和「子域名-preview」；
+# Ping 每次心跳再核一次，地址被收回或口令被重置后，已连着的电脑会被断开。
+# 这一段必须放在文件最后：TOML 里 [[httpPlugins]] 之后的所有键都会算进插件，
+# 写在它后面的 webServer、vhostHTTPPort 等就不再是 frps 的设置。
+[[httpPlugins]]
+name = "mirrormix"
+addr = "127.0.0.1:7200"
+path = "/handler"
+ops = ["Login", "NewProxy", "Ping"]
