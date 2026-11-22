@@ -150,7 +150,10 @@ export function PluginsDialog({
   context,
   onOpenMarket,
   onClose,
+  startWith,
 }: {
+  /** Phone: the plugin to open at once (chosen from 设置); going back from it leaves the page. */
+  startWith?: PluginId;
   /** "desk": a computer's page beside the left bar (list in the middle column, plugin on the right). */
   variant?: "dialog" | "page" | "desk";
   installed: string[] | null;
@@ -163,6 +166,7 @@ export function PluginsDialog({
   const list = (installed ?? []).map(byId).filter((plugin): plugin is PluginInfo => Boolean(plugin));
   // The page reopens on the plugin used last (per browser); the dialog and the phone start from their list.
   const [chosen, setChosen] = useState<PluginId | null>(() => {
+    if (startWith) return startWith;
     if (variant !== "desk") return null;
     try {
       return (localStorage.getItem(LAST_PLUGIN) as PluginId | null) ?? null;
@@ -197,9 +201,10 @@ export function PluginsDialog({
     [page],
   );
   const closePlugin = useCallback(() => {
-    if (subEntry.current) window.history.back();
+    if (startWith) onClose();
+    else if (subEntry.current) window.history.back();
     else setChosen(null);
-  }, []);
+  }, [startWith, onClose]);
   useEffect(() => {
     if (!page) return;
     const onPop = () => {
@@ -308,7 +313,7 @@ export function PluginsDialog({
       return (
         <section className="settings-page is-sub" aria-labelledby="plugin-title">
           <header className="settings-head settings-subhead">
-            <button type="button" className="icon-button settings-back" aria-label="返回我的插件" onClick={closePlugin}>
+            <button type="button" className="icon-button settings-back" aria-label={startWith ? "返回设置" : "返回我的插件"} onClick={closePlugin}>
               <BackIcon />
             </button>
             {/* A phone's bar: back and the name. What the plugin does was on the row that opened it. */}

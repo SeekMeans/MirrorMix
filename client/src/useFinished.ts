@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ALL_TOOLS, type Catalog, type ToolId } from "./api";
 
 const FINISHED_KEY = "mirrormix.finished";
+const WORKING_KEY = "mirrormix.working";
 
 function readFinished(): Set<string> {
   try {
@@ -16,6 +17,27 @@ function saveFinished(keys: Set<string>) {
     localStorage.setItem(FINISHED_KEY, JSON.stringify([...keys]));
   } catch {
     /* private mode: the list just lasts for this visit */
+  }
+}
+
+/**
+ * The sessions replying when this page last looked. A phone browser often drops a page left in the background, so a
+ * reply that finishes meanwhile is still caught when the page loads again.
+ */
+function readWorking(): Set<string> | null {
+  try {
+    const saved = localStorage.getItem(WORKING_KEY);
+    return saved ? new Set(JSON.parse(saved) as string[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveWorking(keys: Set<string>) {
+  try {
+    localStorage.setItem(WORKING_KEY, JSON.stringify([...keys]));
+  } catch {
+    /* private mode */
   }
 }
 
@@ -49,7 +71,7 @@ export function clearFinishedAfterNativeRead(
  */
 export function useFinished(catalog: Catalog | null, viewing: string): Set<string> {
   const [finished, setFinished] = useState(readFinished);
-  const working = useRef<Set<string> | null>(null);
+  const working = useRef<Set<string> | null>(readWorking());
   const unread = useRef<Set<string> | null>(null);
   const viewingRef = useRef(viewing);
   viewingRef.current = viewing;
@@ -74,6 +96,7 @@ export function useFinished(catalog: Catalog | null, viewing: string): Set<strin
     const before = working.current;
     const unreadBefore = unread.current;
     working.current = now;
+    saveWorking(now);
     unread.current = unreadNow;
     setFinished((current) => {
       const next = new Set(current);

@@ -73,8 +73,8 @@ export function SettingsDialog({
   /** This computer's name and the way out, which a phone has nowhere else to put. */
   host?: string;
   onLogout?: () => void;
-  /** Phone: opens 插件, which lives under 设置 there. */
-  onPlugins?: () => void;
+  /** Phone: opens one added plugin, listed as a row of 设置 there. */
+  onPlugins?: (id: PluginId) => void;
   /** How many plugins are added, shown on that row; null while unknown. */
   pluginCount?: number | null;
   prefs: ToolPrefs | null;
@@ -320,21 +320,6 @@ export function SettingsDialog({
             )}
           </section>
 
-          {onPlugins && (
-            <div className="pref-group">
-              <button type="button" className="pref-row" onClick={onPlugins}>
-                <span className="pref-icon">
-                  <PuzzleIcon />
-                </span>
-                <span className="pref-title">插件</span>
-                <span className="pref-value">{pluginCount == null ? "" : `${pluginCount} 个`}</span>
-                <span className="pref-caret">
-                  <ChevronIcon />
-                </span>
-              </button>
-            </div>
-          )}
-
           <div className="pref-group">
             <button type="button" className="pref-row" onClick={() => openSub("tools")}>
               <span className="pref-title">AI 工具</span>
@@ -362,8 +347,36 @@ export function SettingsDialog({
             </div>
           </div>
 
+          {/* Each added plugin is a row of its own, opened straight from here; the market adds more. */}
+          {onPlugins && (
+            <div className="pref-group">
+              {PLUGINS.filter((plugin) => installed?.includes(plugin.id)).map(({ id, name, Icon }) => (
+                <button key={id} type="button" className="pref-row" onClick={() => onPlugins(id)}>
+                  <span className="pref-icon">
+                    <Icon />
+                  </span>
+                  <span className="pref-title">{name}</span>
+                  <span className="pref-value" />
+                  <span className="pref-caret">
+                    <ChevronIcon />
+                  </span>
+                </button>
+              ))}
+              <button type="button" className="pref-row" onClick={() => openSub("market")}>
+                <span className="pref-icon">
+                  <StoreIcon />
+                </span>
+                <span className="pref-title">插件市场</span>
+                <span className="pref-value">{pluginCount == null ? "" : `已添加 ${pluginCount} 个`}</span>
+                <span className="pref-caret">
+                  <ChevronIcon />
+                </span>
+              </button>
+            </div>
+          )}
+
           <div className="pref-group">
-            {(["remote", "help"] as MenuPage[]).map((key) => {
+            {(["help"] as MenuPage[]).map((key) => {
               const { title, Icon } = PAGES[key];
               return (
                 <button key={key} type="button" className="pref-row" onClick={() => openSub(key)}>

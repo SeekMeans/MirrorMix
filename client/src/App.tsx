@@ -317,7 +317,10 @@ export function App({ onLogout }: { onLogout?: () => void }) {
   }, []);
 
   const pluginsEntry = useRef(false);
-  const showPlugins = useCallback(() => {
+  // The plugin chosen from a row of 设置.
+  const [pluginStart, setPluginStart] = useState<PluginId | undefined>(undefined);
+  const showPlugins = useCallback((id?: PluginId) => {
+    setPluginStart(id);
     setScreen("plugins");
     if (pluginsEntry.current) return;
     try {
@@ -607,7 +610,8 @@ export function App({ onLogout }: { onLogout?: () => void }) {
   const conversationShown = !mobile || screen === "chat";
   const listShown = !mobile || screen === "list";
   // On a phone, going back to the list leaves the session even though it stays selected.
-  const finished = useFinished(catalog, sessionKey);
+  // On a phone the last session stays chosen after going back to the list; it is only seen while its page is showing.
+  const finished = useFinished(catalog, conversationShown ? sessionKey : "");
   // Today's figures only when the workbench is quiet: nothing replying and no finished reply waiting to be read.
   const workbenchQuiet = useMemo(() => isWorkbenchQuiet(catalog, shownTools, offlineTools, finished), [catalog, shownTools, offlineTools, finished]);
   const homeCount = useMemo(() => {
@@ -919,7 +923,7 @@ export function App({ onLogout }: { onLogout?: () => void }) {
       )}
 
       {mobile && screen === "plugins" && (
-        <PluginsDialog variant="page" installed={installed} context={{ jobs, placeOf, mobile: true }} onOpenMarket={openMarket} onClose={leavePlugins} />
+        <PluginsDialog key={pluginStart ?? "list"} variant="page" startWith={pluginStart} installed={installed} context={{ jobs, placeOf, mobile: true }} onOpenMarket={openMarket} onClose={leavePlugins} />
       )}
 
       {mobile && screen === "settings" && (
@@ -967,6 +971,8 @@ export function App({ onLogout }: { onLogout?: () => void }) {
                     setScreen("list");
                   } else {
                     pluginsEntry.current = false;
+                    // The 设置 tab always opens on its first page, not on 插件市场 where the market icon last sent it.
+                    if (key === "settings") setSettingsStart(undefined);
                     setScreen(key);
                   }
                 }}
