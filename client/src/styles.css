@@ -4191,7 +4191,7 @@ button.model-chip:hover,
    Teal only says something is on (tools online, tasks enabled); everything else is ink and grey. */
 
 .is-mobile .settings-page:not(.is-sub) { background: var(--rail); }
-.is-mobile .settings-page:not(.is-sub) > .settings-body { display: grid; align-content: start; gap: 14px; padding-left: 12px; padding-right: 12px; }
+.is-mobile .settings-page:not(.is-sub) > .settings-body { display: grid; align-content: start; gap: 14px; padding-left: 0; padding-right: 0; }
 
 /* ---- 插件: a card per plugin, its whole description, a fact where there is one, then 添加插件 */
 .mine-cards { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
@@ -4307,7 +4307,7 @@ button.pref-row:active { background: var(--rail); }
 
 /* 这台电脑 on a phone runs edge to edge and up into the top of the screen: one band with the page, not a card on it. */
 .is-mobile .settings-page:not(.is-sub) > .settings-body > .me-card {
-  margin: calc(-12px - env(safe-area-inset-top)) -12px 0;
+  margin: calc(-12px - env(safe-area-inset-top)) 0 0;
   padding: calc(20px + env(safe-area-inset-top)) 16px 18px 20px;
   border: 0;
   border-bottom: 1px solid var(--rail-line, var(--line));
@@ -4315,6 +4315,9 @@ button.pref-row:active { background: var(--rail); }
   /* No panel of its own: it sits on the page, and the line below separates it from the settings. */
   background: transparent;
 }
+
+/* Settings follow WeChat's full-width grouped rows; the page ground shows only between groups. */
+.is-mobile .settings-page:not(.is-sub) > .settings-body > .pref-group { border: 0; border-radius: 0; }
 
 /* Phone rows that lead with a tool mark: room between the selected line and the mark. */
 .is-mobile .session:has(.session-tool) { padding-left: 20px; }
