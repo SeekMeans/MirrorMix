@@ -141,8 +141,7 @@ function Find-ClaudeWindows {
     try { $processName = (Get-Process -Id $win.Current.ProcessId -ErrorAction Stop).ProcessName } catch { continue }
     if ($Tool -eq 'claude' -and $processName -ine 'claude') { continue }
     if ($Tool -eq 'codex' -and $processName -notin @('ChatGPT','Codex')) { continue }
-    $prompt = Find-Prompt $win
-    if ($prompt) { $found += $win }
+    if ($Tool -eq 'codex' -or (Find-Prompt $win)) { $found += $win }
   }
   return $found
 }
@@ -150,8 +149,12 @@ function Find-ClaudeWindows {
 function Find-Prompt($win) {
   $names = if ($Tool -eq 'claude') { @('Prompt', '提示词') } else { @('和 Codex 一起工作', 'Work with Codex') }
   foreach ($name in $names) {
-    $hit = $win.FindFirst([System.Windows.Automation.TreeScope]::Descendants,
-      (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty, $name)))
+    $condition = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty, $name)
+    if ($Tool -eq 'codex') {
+      $edit = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::Edit)
+      $condition = New-Object System.Windows.Automation.AndCondition($condition, $edit)
+    }
+    $hit = $win.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condition)
     if ($hit) { return $hit }
   }
   return $null
@@ -178,6 +181,29 @@ function Get-ActiveTitle($win) {
 function Same-Title([string]$active, [string]$wanted) {
   if (-not $active -or -not $wanted) { return $false }
   return ($active -replace '\s+', ' ').Trim() -eq ($wanted -replace '\s+', ' ').Trim()
+}
+
+function Get-CodexThreadLink([string]$threadId) {
+  if ($threadId -match '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') {
+    return "codex://threads/$threadId"
+  }
+  return $null
+}
+
+function Open-CodexThread([string]$link, [string]$title) {
+  if (-not $title -or -not (Test-Path -LiteralPath 'Registry::HKEY_CLASSES_ROOT\codex')) { return $null }
+  try { Start-Process -FilePath $link -ErrorAction Stop } catch { return $null }
+  Start-Sleep -Milliseconds 800
+  $deadline = [DateTime]::UtcNow.AddSeconds(8)
+  do {
+    foreach ($candidate in @(Find-ClaudeWindows)) {
+      try {
+        if ((Same-Title (Get-ActiveTitle $candidate) $title) -and (Find-Prompt $candidate)) { return $candidate }
+      } catch { }
+    }
+    Start-Sleep -Milliseconds 200
+  } while ([DateTime]::UtcNow -lt $deadline)
+  return $null
 }
 
 function Has-Draft([string]$text, [string]$placeholder) {
@@ -503,12 +529,18 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
     }
     if ($shown.Count -gt 0) { Start-Sleep -Milliseconds 500 }
     if (-not $win) {
-      foreach ($candidate in $windows) {
-        if (Select-Session $candidate $title) { $win = $candidate; break }
+      $threadLink = if ($Tool -eq 'codex') { Get-CodexThreadLink $req.threadId } else { $null }
+      if ($threadLink) {
+        $win = Open-CodexThread $threadLink $title
+      } else {
+        foreach ($candidate in $windows) {
+          if (Select-Session $candidate $title) { $win = $candidate; break }
+        }
       }
     }
     if (-not $win) { Emit $false "missing" ""; continue }
     $prompt = Find-Prompt $win
+    if (-not $prompt) { Emit $false "missing" "composer not found"; continue }
     if ($req.op -eq "stop") {
       # The app's own Stop button beside the input box, shown while a reply runs. The box itself is not touched.
       $stopButton = Find-ComposerButton $prompt @("Stop", "Stop response", "Stop generating", "Interrupt", "停止", "停止回复", "停止响应", "停止生成", "中断")

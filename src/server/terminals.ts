@@ -7,6 +7,8 @@ import { randomUUID } from "node:crypto";
  */
 
 export interface ShellProcess {
+  /** The cmd.exe's own process id, so the programs started in it can be found and stopped. */
+  pid?: number;
   write(data: string): void;
   resize(cols: number, rows: number): void;
   kill(): void;
@@ -19,6 +21,8 @@ export interface TerminalInfo {
   /** "1", "2"…: the order it was opened in within its project. */
   label: string;
   createdAt: string;
+  /** Set on a tab opened for one of the project's services (前端, 后端…): its name, also shown as the label. */
+  service?: string;
 }
 
 export interface TerminalSink {
@@ -41,6 +45,14 @@ const BACKLOG_CHARS = 200_000;
 /** Output is gathered this long before it goes out, so a burst becomes one frame instead of hundreds. */
 const FLUSH_MS = 8;
 export const MAX_PER_PROJECT = 8;
+
+/** Keeps the last BACKLOG_CHARS, cut at a line start so the replay never begins inside a colour code or a character pair. */
+export function trimBacklog(text: string): string {
+  if (text.length <= BACKLOG_CHARS) return text;
+  const tail = text.slice(-BACKLOG_CHARS);
+  const line = tail.indexOf("\n");
+  return line >= 0 && line < 4096 ? tail.slice(line + 1) : tail;
+}
 
 /** Device-attribute inquiries are one-time handshakes, not display state to repeat on reconnect. */
 export function replayTerminalOutput(data: string): string {
@@ -69,7 +81,7 @@ export function createTerminalHub(open: (cwd: string, cols: number, rows: number
 
   const list = (key: string): TerminalInfo[] => listOf(key).map((entry) => entry.info);
 
-  const create = (key: string, cwd: string): TerminalInfo => {
+  const create = (key: string, cwd: string, service?: string): TerminalInfo => {
     const current = listOf(key);
     if (current.length >= MAX_PER_PROJECT) throw new TerminalError("too_many");
     let shell: ShellProcess;
@@ -82,7 +94,12 @@ export function createTerminalHub(open: (cwd: string, cols: number, rows: number
     let number = 1;
     while (used.has(String(number))) number += 1;
     const entry: Entry = {
-      info: { tid: `t${randomUUID()}`, label: String(number), createdAt: new Date().toISOString() },
+      info: {
+        tid: `t${randomUUID()}`,
+        label: service ?? String(number),
+        createdAt: new Date().toISOString(),
+        ...(service ? { service } : {}),
+      },
       shell,
       backlog: "",
       sinks: new Set(),
@@ -90,7 +107,7 @@ export function createTerminalHub(open: (cwd: string, cols: number, rows: number
       flush: null,
     };
     shell.onData((data) => {
-      entry.backlog = (entry.backlog + data).slice(-BACKLOG_CHARS);
+      entry.backlog = trimBacklog(entry.backlog + data);
       if (!entry.sinks.size) return;
       entry.pending += data;
       entry.flush ??= setTimeout(() => {
@@ -162,7 +179,16 @@ export function createTerminalHub(open: (cwd: string, cols: number, rows: number
   };
 
   const ensure = (key: string, cwd: string) => listOf(key)[0]?.info ?? create(key, cwd);
-  return { list, create, ensure, close, attach, dispose };
+  /** The tab a service runs in, if it is still open. */
+  const serviceTab = (key: string, service: string) => listOf(key).find((entry) => entry.info.service === service)?.info;
+  const pidOf = (key: string, tid: string) => find(key, tid)?.shell.pid;
+  /** Types into a tab as if from its screen. */
+  const write = (key: string, tid: string, data: string) => {
+    const entry = find(key, tid);
+    if (!entry) throw new TerminalError("unknown_terminal");
+    entry.shell.write(data);
+  };
+  return { list, create, ensure, close, attach, dispose, serviceTab, pidOf, write };
 }
 
 export type TerminalHub = ReturnType<typeof createTerminalHub>;

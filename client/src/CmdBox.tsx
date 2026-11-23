@@ -6,6 +6,7 @@ import { api, liveUrl, type ShortcutLibrary, type TerminalInfo, type TerminalLis
 import { workspaceTerminalKey } from "../../src/shared/terminalScope";
 import { ChevronIcon, CloseIcon, PlusIcon } from "./icons";
 import { ShortcutMenu } from "./ShortcutMenu";
+import { ServiceMenu } from "./ServiceMenu";
 import type { RunRequest } from "./runCommand";
 
 const SIZE_KEY = "mirrormix.cmd.size";
@@ -205,7 +206,9 @@ export function CmdBox({
   const [starting, setStarting] = useState(false);
   const [line, setLine] = useState("");
   const [size, setSize] = useState<PanelSize>(readSize);
+  /** Which header menu is open: the shortcut list or the project's services. */
   const [open, setOpen] = useState(false);
+  const [servicesOpen, setServicesOpen] = useState(false);
   const [chosen, setChosen] = useState<string | null>(null);
   const [project, setProject] = useState<TerminalProject | null>(null);
   const [closingTid, setClosingTid] = useState<string | null>(null);
@@ -331,18 +334,29 @@ export function CmdBox({
 
   useEffect(() => {
     setOpen(false);
+    setServicesOpen(false);
     setChosen(null);
   }, [cwd]);
 
+  /** A service was started: its tab may be new, so take the list the server sent and show that tab. */
+  const adopt = useCallback((result: TerminalList, focus?: string) => {
+    if (contextRef.current !== context) return;
+    readSequence.current += 1;
+    applyList(result, focus);
+    if (focus) setServicesOpen(false);
+  }, [context, applyList]);
+
   useEffect(() => {
-    if (!open) return;
+    if (!open && !servicesOpen) return;
     const onPointer = (event: PointerEvent) => {
       if (keysRef.current?.contains(event.target as Node)) return;
       setOpen(false);
+      setServicesOpen(false);
     };
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       setOpen(false);
+      setServicesOpen(false);
     };
     window.addEventListener("pointerdown", onPointer);
     window.addEventListener("keydown", onKey);
@@ -350,7 +364,7 @@ export function CmdBox({
       window.removeEventListener("pointerdown", onPointer);
       window.removeEventListener("keydown", onKey);
     };
-  }, [open]);
+  }, [open, servicesOpen]);
 
   const sendRaw = (data: string) => {
     const socket = socketRef.current;
@@ -464,9 +478,20 @@ export function CmdBox({
           className={open ? "cmd-pick is-open" : "cmd-pick"}
           aria-expanded={open}
           aria-controls={open ? "global-shortcut-menu" : undefined}
-          onClick={() => setOpen((value) => !value)}
+          onClick={() => { setServicesOpen(false); setOpen((value) => !value); }}
         >
           <span>{chosen ?? "快捷命令"}</span>
+          <span className="cmd-chevron"><ChevronIcon /></span>
+        </button>
+        <button
+          type="button"
+          className={servicesOpen ? "cmd-pick is-open" : "cmd-pick"}
+          aria-expanded={servicesOpen}
+          aria-controls={servicesOpen ? "project-service-menu" : undefined}
+          title="一键启动、重启项目的前端和后端"
+          onClick={() => { setOpen(false); setServicesOpen((value) => !value); }}
+        >
+          <span>启动服务</span>
           <span className="cmd-chevron"><ChevronIcon /></span>
         </button>
           </>
@@ -482,6 +507,9 @@ export function CmdBox({
         </button>
         {open && mode === "cmd" && (
           <ShortcutMenu key={`${tool}:${id}:${active}`} cwd={cwd} ready={ready} initial={shortcuts} onRun={run} onChoose={name => { setChosen(name); setOpen(false); }} />
+        )}
+        {servicesOpen && mode === "cmd" && (
+          <ServiceMenu key={`${tool}:${id}`} tool={tool} id={id} onTerminals={adopt} onShow={tid => { choose(tid); setServicesOpen(false); }} />
         )}
       </div>
       {closingTid && mode === "cmd" && <div className="cmd-close-confirm" role="alert">

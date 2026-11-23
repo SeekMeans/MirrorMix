@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { countToday, type TodayStats } from "../catalog/todayStats";
+import { countToday, startOfToday, type TodayStats } from "../catalog/todayStats";
+import { isCodexHistoryReference } from "../catalog/codexSqliteHistory";
 import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 import { cursorChatModel, readCursorQueue } from "../catalog/cursor";
@@ -99,6 +100,7 @@ interface Runtime {
   /** How many times the same words were already in the transcript when the echoed message was sent. */
   echoSeen?: number;
   pendingTurn?: boolean;
+  codexSending?: boolean;
   /** Follow-ups sent while a round is still running. `seen` is how many times that text was already in the transcript. */
   queued?: QueuedItem[];
   /** The session the process was asked to resume, kept so it can be started again. */
@@ -137,7 +139,8 @@ export interface SupervisorOptions {
   pollMs?: number;
   /** Desktop deployments must never silently launch a separate CLI conversation. */
   desktopOnly?: boolean;
-  submitCodex?: (title: string, text: string) => Promise<void>;
+  submitCodex?: (title: string, text: string, sessionId: string) => Promise<void>;
+  codexReceiptMs?: number;
   codexDesktopSession?: (sessionId: string) => { title: string } | null;
   findClaudeInbox?: (sessionId: string, skipPids: number[]) => ClaudeInbox | null;
   injectClaude?: (inbox: ClaudeInbox, text: string) => Promise<void>;
@@ -152,7 +155,7 @@ export interface SupervisorOptions {
   trash?: (paths: string[]) => Promise<void>;
   /** Clicks Stop in the Claude or Codex window for the session titled so. Throws "idle" when nothing runs there. */
   stopDesktop?: (title: string) => Promise<void>;
-  stopCodex?: (title: string) => Promise<void>;
+  stopCodex?: (title: string, sessionId: string) => Promise<void>;
   /** Starts a session in the Claude desktop app for a folder it lists, with its first message. Rejects with a reason. */
   createDesktop?: (folder: string, text: string) => Promise<void>;
   /** Whether a new session may wait for the desktop app: the app is open and the screen is not locked. */
@@ -303,8 +306,10 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
   const ownedPids = () =>
     [...runtimes.values()].flatMap((runtime) => (runtime.pty && runtime.status !== "exited" ? [runtime.pty.pid] : []));
 
-  const findStored = (tool: ToolId, id: string) =>
-    indexSessions(options.roots)[tool].find((session) => session.id === id);
+  const findStored = (tool: ToolId, id: string) => {
+    const stored = indexSessions(options.roots)[tool].find((session) => session.id === id);
+    return stored && isCodexHistoryReference(stored.filePath) ? readSession(tool, stored.filePath) ?? undefined : stored;
+  };
 
   const workspaceKnown = (tool: ToolId, workspacePath: string) =>
     indexSessions(options.roots)[tool].some((session) => samePath(session.cwd, workspacePath)) ||
@@ -318,6 +323,10 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
       : stored;
 
   const viewOf = (runtime: Runtime): SessionView => {
+    if (runtime.tool === "codex" && runtime.filePath && !isCodexHistoryReference(runtime.filePath) && !existsSync(runtime.filePath)) {
+      const found = findStored("codex", runtime.id);
+      if (found) runtime.filePath = found.filePath;
+    }
     if (runtime.tool === "cursor" && runtime.filePath?.startsWith("cursor:")) {
       const found = findStored("cursor", runtime.id);
       if (found && !found.filePath.startsWith("cursor:")) runtime.filePath = found.filePath;
@@ -353,7 +362,9 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
         sentAt > 0 &&
         Date.now() - sentAt > ECHO_GRACE_MS &&
         Date.parse(stored.updatedAt) > sentAt;
-      if (answered || stopped || finished || lost) {
+      const unconfirmedCodex = runtime.tool === "codex" && !runtime.codexSending && echoed < 0 &&
+        sentAt > 0 && Date.now() - sentAt > ECHO_GRACE_MS;
+      if (answered || stopped || finished || lost || unconfirmedCodex) {
         runtime.echo = undefined;
         runtime.pendingTurn = false;
       } else if (echoed < 0) {
@@ -366,9 +377,12 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
         : "";
     const userTexts = messages.filter((message) => message.role === "user").map((message) => message.text);
     const clientQueue = runtime.tool === "cursor" ? readCursorQueue(options.roots.cursorStateDb, runtime.id) : null;
-    const queued = reconcileQueue(runtime.queued ?? [], clientQueue, userTexts, Date.now());
+    const now = Date.now();
+    const pendingQueue = runtime.tool === "codex" && !running
+      ? runtime.queued?.filter((item) => now - (item.at ?? 0) <= ECHO_GRACE_MS) : runtime.queued;
+    const queued = reconcileQueue(pendingQueue ?? [], clientQueue, userTexts, now);
     runtime.queued = queued.length ? queued : undefined;
-    const shown = withRound(appendDesktopStream(messages, live), running, runtime.pendingTurn ? runtime.echoAt : undefined);
+    const shown = withRound(appendDesktopStream(messages, live), running, runtime.tool !== "codex" && runtime.pendingTurn ? runtime.echoAt : undefined);
     const withQueue = queued.length
       ? [...shown, ...queued.map((item, index) => ({ id: `queued-${index}`, role: "user" as const, text: item.text }))]
       : shown;
@@ -378,7 +392,7 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
     // A running round still accepts a follow-up. The client queues it instead of starting a second reply.
     // A DeepSeek session made in its desktop app can only go on there: the command line refuses its preset.
     const appOnly = runtime.tool === "deepseek" && Boolean(stored?.agentPreset) && !options.deepseekApp?.available();
-    const sendEnabled = runtime.status === "running" && screenReady && !runtime.binding && !appOnly;
+    const sendEnabled = runtime.status === "running" && screenReady && !runtime.binding && !appOnly && !runtime.codexSending;
     return {
       id: runtime.id,
       tool: runtime.tool,
@@ -427,7 +441,7 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
             session.working && runtime?.pty && runtime.filePath
               ? currentRound(runtime, readSession(runtime.tool, runtime.filePath, options.roots.cursorStateDb))?.turnComplete === true
               : false;
-          const activity = shownActivity(stale ? { ...session, working: false } : session, Boolean(runtime?.pendingTurn), live.trim().length > 0);
+          const activity = shownActivity(stale ? { ...session, working: false } : session, tool !== "codex" && Boolean(runtime?.pendingTurn), live.trim().length > 0);
           return {
             ...session,
             title: session.title || runtime?.title || "",
@@ -732,6 +746,7 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
       return viewOf(draft);
     }
     const before = new Set(filesFor(tool));
+    const beforeThreads = tool === "codex" ? new Set(indexSessions(options.roots).codex.map((session) => session.id)) : new Set<string>();
     const newId = tool === "claude" ? randomUUID() : undefined;
     const pty = launch(tool, workspacePath, undefined, newId);
     const runtime: Runtime = {
@@ -763,16 +778,16 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
           return;
         }
         const appeared = filesFor(tool).filter((file) => !before.has(file));
-        if (!appeared.length) return;
         // Another Codex in the same folder can write a session file meanwhile. Only the file that starts with
         // the message sent from here is this one.
         const sent = runtime.echo;
         if (!sent) return;
         const stored = indexSessions(options.roots)[tool].find(
           (session) =>
-            appeared.includes(session.filePath) &&
+            (appeared.includes(session.filePath) || (tool === "codex" && isCodexHistoryReference(session.filePath) && !beforeThreads.has(session.id))) &&
             samePath(session.cwd, workspacePath) &&
-            session.messages.some((message) => message.role === "user" && sameWords(message.text) === sameWords(sent)),
+            (isCodexHistoryReference(session.filePath) ? readSession(tool, session.filePath)?.messages ?? [] : session.messages)
+              .some((message) => message.role === "user" && sameWords(message.text) === sameWords(sent)),
         );
         if (!stored) return;
         clearInterval(timer);
@@ -857,6 +872,7 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
     const current = runtime ? viewOf(runtime) : null;
     if (!runtime || !current?.sendEnabled) throw new ApiError(409, "not_idle");
     const inTurn = Boolean(current.messages.some((message) => message.role === "turn" && !message.endedAt));
+    const desktopHistory = tool === "codex" && isCodexHistoryReference(runtime.filePath ?? "");
     const remember = () => {
       if (inTurn) {
         const seen = current.messages.filter((message) => message.role === "user" && message.text === text).length;
@@ -1058,10 +1074,30 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
         (runtime.filePath ? readSession(runtime.tool, runtime.filePath, options.roots.cursorStateDb)?.title : "") ||
         runtime.title;
       try {
-        if (tool === "codex" && options.submitCodex) await options.submitCodex(title, text);
-        else if (options.submitDesktop) await options.submitDesktop(title, text);
+        if (tool === "codex" && options.submitCodex) {
+          runtime.codexSending = true;
+          const copies = runtime.echoSeen ?? 0;
+          await options.submitCodex(title, text, runtime.id);
+          if (desktopHistory && !inTurn) {
+            const deadline = Date.now() + (options.codexReceiptMs ?? ECHO_GRACE_MS);
+            const sent = sameWords(text);
+            for (;;) {
+              const observed = readSession("codex", runtime.filePath!)?.messages.filter(
+                (message) => message.role === "user" && sameWords(message.text) === sent,
+              ).length ?? 0;
+              if (observed > copies) break;
+              const left = deadline - Date.now();
+              if (left <= 0) throw new ApiError(502, "codex_delivery_unconfirmed");
+              await pause(Math.min(pollMs, left));
+            }
+          }
+        } else if (options.submitDesktop) await options.submitDesktop(title, text);
         else await (options.injectClaude ?? injectClaudeInbox)(runtime.inbox, text);
       } catch (error) {
+        if (error instanceof ApiError) {
+          abandonEarly();
+          throw error;
+        }
         const reason = error instanceof Error ? error.message : "";
         if (reason === "busy") {
           abandonEarly();
@@ -1104,6 +1140,10 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
             }
           }
           if (!queued) {
+            if (desktopHistory || inTurn) {
+              abandonEarly();
+              throw new ApiError(502, reason === "locked" ? "codex_locked" : reason === "missing" ? "codex_unavailable" : "codex_failed");
+            }
             try {
               await takeOver(runtime, text, reason === "locked" ? "codex_locked" : "codex_failed");
             } catch (fallbackError) {
@@ -1163,6 +1203,9 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
             }
           }
         }
+      } finally {
+        runtime.codexSending = false;
+        if (tool === "codex") emit(tool, id);
       }
     } else if (runtime.pty) {
       // The Codex terminal stops reading keystrokes while the screen is locked. The daemon still accepts a queued message.
@@ -1377,20 +1420,32 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
     // MirrorMix's own Claude Code or Codex terminal: Esc stops the reply in both.
     if (runtime.pty) {
       runtime.pty.write("\u001b");
+      if (tool === "codex") {
+        runtime.echo = undefined;
+        runtime.pendingTurn = false;
+      }
       emit(tool, id);
       return;
     }
     if (runtime.inbox && (tool === "claude" || tool === "codex")) {
-      const stop = tool === "codex" ? options.stopCodex : options.stopDesktop;
-      if (!stop) throw new ApiError(409, "stop_unsupported");
+      if (tool === "codex" ? !options.stopCodex : !options.stopDesktop) throw new ApiError(409, "stop_unsupported");
       const title =
         (tool === "claude" ? options.desktopSession?.(id)?.title : options.codexDesktopSession?.(id)?.title) ||
         (runtime.filePath ? readSession(runtime.tool, runtime.filePath, options.roots.cursorStateDb)?.title : "") ||
         runtime.title;
       try {
-        await stop(title);
+        if (tool === "codex") await options.stopCodex!(title, runtime.id);
+        else await options.stopDesktop!(title);
       } catch (error) {
         const reason = error instanceof Error ? error.message : "";
+        if (tool === "codex" && !runtime.codexSending && (reason === "idle" || reason === "missing") &&
+          !viewOf(runtime).messages.some((message) => message.role === "turn" && !message.endedAt)) {
+          runtime.echo = undefined;
+          runtime.pendingTurn = false;
+          runtime.queued = undefined;
+          emit(tool, id);
+          return;
+        }
         if (reason === "idle") throw new ApiError(409, "not_running");
         if (reason === "locked") throw new ApiError(502, "desktop_locked");
         if (reason === "missing") throw new ApiError(502, "desktop_missing");
@@ -1546,7 +1601,7 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
       tool === "deepseek" ||
       (tool === "claude" && Boolean(options.desktopSession?.(id))) ||
       (tool === "codex" && Boolean(options.codexDesktopSession?.(id)));
-    if (appOwned || !stored?.filePath || !options.trash) {
+    if (appOwned || !stored?.filePath || isCodexHistoryReference(stored.filePath) || !options.trash) {
       if (!options.hidden) throw new ApiError(500, "delete_failed");
       options.hidden.add(tool, id);
       forget();
@@ -1572,10 +1627,14 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
     remove,
     todayStats: () => {
       const today = indexSessions(options.roots);
+      const now = Date.now();
+      const since = startOfToday(now);
       return countToday({
         ...today,
+        codex: today.codex.map((session) => isCodexHistoryReference(session.filePath) && Date.parse(session.updatedAt) >= since
+          ? readSession("codex", session.filePath) ?? session : session),
         cursor: today.cursor.map((session) => readSession("cursor", session.filePath, options.roots.cursorStateDb) ?? session),
-      });
+      }, now);
     },
     // A new Claude session can still start in the desktop app without the CLI; a new Codex one cannot.
     capabilities: () => ({

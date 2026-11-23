@@ -41,6 +41,7 @@ export function errorText(code: string | undefined): string {
   if (code === "codex_locked") return "电脑锁屏了，这条消息没能交给 Codex 的后台。";
   if (code === "codex_unavailable") return "没有在 Codex 桌面窗口里找到这条会话。先在 Codex 里点开它，再从这里发送。";
   if (code === "codex_failed") return "消息没有从 Codex 桌面窗口发出，请查看桌面端的输入框和提示。";
+  if (code === "codex_delivery_unconfirmed") return "未能确认 Codex 收到这条消息。草稿和附件已保留，请先在桌面端确认，避免重复发送。";
   if (code === "not_running") return "这条会话现在没有正在进行的回复。";
   if (code === "stop_unsupported") return "这类会话不能从网页终止回复，请在它自己的界面里停止。";
   if (code === "desktop_locked") return "电脑屏幕已锁定，没法点桌面端的停止按钮。解锁后再试。";

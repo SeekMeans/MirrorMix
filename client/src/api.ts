@@ -68,6 +68,7 @@ export interface SessionSummary {
 
 export interface WorkspaceGroup {
   path: string;
+  projectName?: string;
   pinned?: boolean;
   /** Shown instead of the folder name, for groups that are not a folder in the tool's own list. */
   label?: string;
@@ -279,7 +280,11 @@ export interface TerminalInfo {
   tid: string;
   label: string;
   createdAt: string;
+  /** A tab opened for one of the project's services: its name. */
+  service?: string;
 }
+export type { ProjectService, ServiceView, ServiceList, ServiceAction } from "../../src/shared/projectServices";
+import type { ProjectService, ServiceList, ServiceAction } from "../../src/shared/projectServices";
 export type { TerminalProject } from "../../src/shared/terminalScope";
 import type { TerminalProject } from "../../src/shared/terminalScope";
 export interface TerminalList { project: TerminalProject; terminals: TerminalInfo[] }
@@ -430,6 +435,15 @@ export const api = {
     request<TerminalList & { terminal: TerminalInfo }>("/api/cmd/new", { method: "POST", body: JSON.stringify({ tool, id, ensure }) }),
   closeTerminal: (tool: ToolId, id: string, tid: string) =>
     request<TerminalList>("/api/cmd/close", { method: "POST", body: JSON.stringify({ tool, id, tid }) }),
+  services: (tool: ToolId, id: string) =>
+    request<ServiceList>(`/api/services?tool=${tool}&id=${encodeURIComponent(id)}`),
+  detectServices: (tool: ToolId, id: string) =>
+    request<{ root: string; services: ProjectService[] }>(`/api/services/detect?tool=${tool}&id=${encodeURIComponent(id)}`),
+  saveServices: (tool: ToolId, id: string, services: ProjectService[]) =>
+    request<ServiceList>("/api/services", { method: "PUT", body: JSON.stringify({ tool, id, services }) }),
+  /** No names: every service of the project. `focus` is the tab to show. */
+  runServices: (tool: ToolId, id: string, action: ServiceAction, names: string[] = []) =>
+    request<ServiceList & TerminalList & { focus?: string }>("/api/services/run", { method: "POST", body: JSON.stringify({ tool, id, action, names }) }),
   answer: (tool: ToolId, id: string, choice: "trust" | "cancel") =>
     request<SessionWindow>("/api/sessions/answer", { method: "POST", body: JSON.stringify({ tool, id, choice }) }),
   /** Stops the reply under way: Esc in MirrorMix's own terminal, the Stop button in the desktop app. */

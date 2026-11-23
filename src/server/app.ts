@@ -11,6 +11,7 @@ import { RemoteError, type RemoteUpdate, type Tunnel } from "../remote/tunnel";
 import type { SettingsStore } from "../settings/toolSettings";
 import type { ToolId, TranscriptMessage } from "../shared/types";
 import { createTerminalHub, TerminalError } from "./terminals";
+import { createServiceRunner, createServiceStore, detectServices, ServiceError, type ProcessOps } from "./projectServices";
 import { slashCommands } from "../catalog/slashCommands";
 import { resolveClaudeDataDir } from "../catalog/claudeData";
 import { listFolder, sendFolderFile } from "./files";
@@ -132,6 +133,7 @@ export interface CommandShell {
   windowsPty?: TerminalProject["windowsPty"];
   /** Starts cmd.exe in this directory. It runs until it is closed from the page or exits on its own. */
   open(cwd: string, cols: number, rows: number): {
+    pid?: number;
     write(data: string): void;
     resize(cols: number, rows: number): void;
     kill(): void;
@@ -177,6 +179,7 @@ export function createApp(
   uploadsDir: string = process.env.AIMISS_UPLOADS || path.join(os.homedir(), ".mirrormix", "uploads"),
   /** The SSH plugin: saved hosts, keychain, terminals, SFTP and port forwarding. */
   ssh?: { manager: SshManager; store: SshStore },
+  serviceProcesses?: ProcessOps,
 ): http.Server {
   const picks =
     previewPicks ??
@@ -186,6 +189,8 @@ export function createApp(
   const sessions = createLoginSessions(gate?.sessionFile);
   const failures: number[] = [];
   const terminals = shells ? createTerminalHub((cwd, cols, rows) => shells.open(cwd, cols, rows)) : null;
+  const serviceStore = createServiceStore(process.env.AIMISS_SERVICES || path.join(os.homedir(), ".mirrormix", "project-services.json"));
+  const services = terminals ? createServiceRunner(terminals, serviceStore, serviceProcesses) : null;
   /** The folder a session's command lines start in, checked to still exist. */
   const sessionFolder = (tool: ToolId, id: string) => {
     let cwd = "";
@@ -569,6 +574,38 @@ export function createApp(
           if (error instanceof TerminalError) {
             return sendJson(response, error.code === "too_many" ? 409 : error.code === "unknown_terminal" ? 404 : 500, { error: error.code });
           }
+          throw error;
+        }
+      }
+      if (url.pathname === "/api/services" || url.pathname === "/api/services/detect" || url.pathname === "/api/services/run") {
+        if (!terminals || !services) return sendJson(response, 404, { error: "not_found" });
+        const isGet = request.method === "GET";
+        type ServiceBody = { tool?: unknown; id?: unknown; services?: unknown; action?: unknown; names?: unknown };
+        const body: ServiceBody = isGet ? {} : await readJson<ServiceBody>(request, 64 * 1024);
+        const tool = asTool(isGet ? url.searchParams.get("tool") : body.tool);
+        const id = isGet ? url.searchParams.get("id") : typeof body.id === "string" ? body.id : null;
+        if (!tool || !id) return sendJson(response, 400, { error: "bad_request" });
+        const project = terminalProject(tool, id, !isGet);
+        try {
+          if (isGet && url.pathname === "/api/services") return sendJson(response, 200, { root: project.root, services: await services.list(project.key) });
+          if (isGet && url.pathname === "/api/services/detect") return sendJson(response, 200, { root: project.root, services: detectServices(project.root) });
+          if (request.method === "PUT" && url.pathname === "/api/services") {
+            serviceStore.set(project.key, project.root, body.services);
+            return sendJson(response, 200, { root: project.root, services: await services.list(project.key) });
+          }
+          if (request.method === "POST" && url.pathname === "/api/services/run") {
+            const action = body.action === "start" || body.action === "stop" || body.action === "restart" ? body.action : null;
+            const names: unknown = body.names === undefined ? [] : body.names;
+            if (!action || !Array.isArray(names) || !names.every((name): name is string => typeof name === "string" && Boolean(name.trim()))) {
+              return sendJson(response, 400, { error: "bad_request" });
+            }
+            const result = await services.run(project.key, project.root, action, names);
+            return sendJson(response, 200, { root: project.root, ...result, project, terminals: terminals.list(project.key) });
+          }
+          return sendJson(response, 405, { error: "bad_request" });
+        } catch (error) {
+          if (error instanceof ServiceError) return sendJson(response, error.status, { error: error.code });
+          if (error instanceof TerminalError) return sendJson(response, error.code === "too_many" ? 409 : 500, { error: error.code });
           throw error;
         }
       }

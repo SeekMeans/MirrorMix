@@ -13,12 +13,13 @@ describe("native desktop selectors", () => {
       $tokens = $null; $errors = $null
       $ast = [System.Management.Automation.Language.Parser]::ParseFile('${source}', [ref]$tokens, [ref]$errors)
       if ($errors.Count) { throw 'PowerShell parse failed' }
-      foreach ($name in @('Find-Prompt', 'Get-ActiveTitle', 'Same-Title', 'Has-Draft', 'Find-SessionItem')) {
+      foreach ($name in @('Find-Prompt', 'Get-ActiveTitle', 'Same-Title', 'Has-Draft', 'Find-SessionItem', 'Get-CodexThreadLink')) {
         $fn = $ast.Find({param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name}, $true)
         Invoke-Expression $fn.Extent.Text
       }
       $win = [pscustomobject]@{}
       $win | Add-Member ScriptMethod FindFirst {param($scope,$condition)
+        if ($condition -is [System.Windows.Automation.AndCondition]) { $condition = $condition.GetConditions()[0] }
         if ($condition.Value -eq $script:promptName) { return [pscustomobject]@{Current=[pscustomobject]@{Name=$condition.Value}} }
         return $null
       }
@@ -28,9 +29,25 @@ describe("native desktop selectors", () => {
       $claude = @{prompt=(Find-Prompt $win).Current.Name; title=(Get-ActiveTitle $win)}
       $Tool = 'codex'; $script:promptName = '和 Codex 一起工作'
       $script:docs = @([pscustomobject]@{Current=[pscustomobject]@{Name='Codex title'}}, [pscustomobject]@{Current=[pscustomobject]@{Name='MirrorMix'}})
-      @{claude=$claude; codex=@{prompt=(Find-Prompt $win).Current.Name; title=(Get-ActiveTitle $win)}; exact=(Same-Title ' 中文  会话 ' '中文 会话'); prefix=(Same-Title '中文会话 2' '中文会话'); placeholderDraft=(Has-Draft ('和 Codex 一起工作' + [char]13) '和 Codex 一起工作'); realDraft=(Has-Draft '未发送的内容' '提示词'); emptyDraft=(Has-Draft '' '提示词')} | ConvertTo-Json -Compress
+      @{
+        claude=$claude
+        codex=@{prompt=(Find-Prompt $win).Current.Name; title=(Get-ActiveTitle $win)}
+        exact=(Same-Title ' 中文  会话 ' '中文 会话')
+        prefix=(Same-Title '中文会话 2' '中文会话')
+        placeholderDraft=(Has-Draft ('和 Codex 一起工作' + [char]13) '和 Codex 一起工作')
+        realDraft=(Has-Draft '未发送的内容' '提示词')
+        emptyDraft=(Has-Draft '' '提示词')
+        link=(Get-CodexThreadLink '00000000-0000-4000-8000-000000000001')
+        invalidLink=(Get-CodexThreadLink 'new?prompt=unexpected')
+      } | ConvertTo-Json -Compress
     `;
     const result = JSON.parse(execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(script, "utf16le").toString("base64")], { encoding: "utf8", windowsHide: true }));
-    expect(result).toEqual({ claude: { prompt: "提示词", title: "中文会话" }, codex: { prompt: "和 Codex 一起工作", title: "Codex title" }, exact: true, prefix: false, placeholderDraft: false, realDraft: true, emptyDraft: false });
+    expect(result).toEqual({
+      claude: { prompt: "提示词", title: "中文会话" },
+      codex: { prompt: "和 Codex 一起工作", title: "Codex title" },
+      exact: true, prefix: false, placeholderDraft: false, realDraft: true, emptyDraft: false,
+      link: "codex://threads/00000000-0000-4000-8000-000000000001",
+      invalidLink: null,
+    });
   });
 });

@@ -77,7 +77,7 @@ export function createDesktopComposer(tool: "claude" | "codex" = "claude", usage
     });
   };
 
-  const request = (op: "send" | "stream" | "usage" | "create" | "stop", title: string, text = "") => {
+  const request = (op: "send" | "stream" | "usage" | "create" | "stop", title: string, text = "", threadId = "") => {
     const run = chain.then(
       () =>
         new Promise<ComposerResponse>((resolve, reject) => {
@@ -112,6 +112,7 @@ export function createDesktopComposer(tool: "claude" | "codex" = "claude", usage
             `${JSON.stringify({
               id,
               op,
+              ...(threadId ? { threadId } : {}),
               title: Buffer.from(title, "utf8").toString("base64"),
               text: Buffer.from(text, "utf8").toString("base64"),
             })}\n`,
@@ -141,11 +142,11 @@ export function createDesktopComposer(tool: "claude" | "codex" = "claude", usage
       console.warn(`[${tool} window] could not start a session in "${folder}": ${response.error || "failed"}${detail ? ` (${detail})` : ""}`);
       throw new Error(response.error || "failed");
     },
-    async submit(title: string, text: string) {
+    async submit(title: string, text: string, threadId?: string) {
       sending += 1;
       let response: ComposerResponse;
       try {
-        response = await request("send", title, text);
+        response = await request("send", title, text, threadId);
       } finally {
         sending -= 1;
       }
@@ -157,11 +158,11 @@ export function createDesktopComposer(tool: "claude" | "codex" = "claude", usage
       throw new Error(response.error || "failed");
     },
     /** Clicks the app's Stop button for the session's running reply. Fails with "idle" when no reply is running. */
-    async stop(title: string) {
+    async stop(title: string, threadId?: string) {
       sending += 1;
       let response: ComposerResponse;
       try {
-        response = await request("stop", title);
+        response = await request("stop", title, "", threadId);
       } finally {
         sending -= 1;
       }
