@@ -86,15 +86,28 @@ export const RoundRow = memo(function RoundRow({ round }: { round: TranscriptMes
     );
   }
   return (
-    <div className="cc-round">
-      <span className="cc-glyph" aria-hidden="true">✻</span>
-      <span>
-        Worked for {formatDuration(Date.parse(round.endedAt) - Date.parse(round.startedAt))}
-        {round.tokens ? ` · ↓ ${formatTokens(round.tokens)} tokens` : ""}
-      </span>
-    </div>
+    <>
+      <div className="cc-round">
+        <span className="cc-glyph" aria-hidden="true">✻</span>
+        <span>
+          Worked for {formatDuration(Date.parse(round.endedAt) - Date.parse(round.startedAt))}
+          {round.tokens ? ` · ↓ ${formatTokens(round.tokens)} tokens` : ""}
+        </span>
+      </div>
+      {round.stalled && <StalledNote tool={round.stalled.tool} limitMs={round.stalled.limitMs} />}
+    </>
   );
 });
+
+/** Under a round MirrorMix closed itself: its last command never answered. */
+function StalledNote({ tool, limitMs }: { tool: string; limitMs: number }) {
+  const limit = limitMs >= 60_000 ? `${Math.round(limitMs / 60_000)} 分钟` : "立即返回";
+  return (
+    <div className="cc-stalled" role="note">
+      {tool} 已经过了它自己的时限（{limit}）还没有结果，可能卡住了，或在等你批准。这一轮先当作结束，发送下一条消息就能接着做。
+    </div>
+  );
+}
 
 export const ThinkingRow = memo(function ThinkingRow({ message }: { message: TranscriptMessage }) {
   const marks = useMarks();

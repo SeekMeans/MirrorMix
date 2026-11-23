@@ -73,6 +73,42 @@ export interface SshSnippet {
   /** Press Enter after pasting it. */
   run: boolean;
   tags: string[];
+  /** What it was written for, when known: a Linux shell, a Windows host (PowerShell), or Python. */
+  kind?: "linux" | "windows" | "python";
+  /** Milliseconds since 1970; absent on snippets saved before they were kept. */
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+/** A command kept for one click: a snippet run in a folder on a host, without opening a terminal. */
+export interface SshTask {
+  id: string;
+  name: string;
+  hostId: string;
+  /** Folder on the host to run in; empty runs in the login folder. "~/…" is the home folder. */
+  dir: string;
+  snippetId: string;
+  /** Words to filter the task list by. */
+  tags: string[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type SshTaskRunState = "running" | "ok" | "failed" | "stopped";
+
+/** One run of a task. The list carries it without `output`; asking for the run by id brings the output. */
+export interface SshTaskRun {
+  id: string;
+  taskId: string;
+  state: SshTaskRunState;
+  exitCode?: number;
+  /** Why it failed before the command could answer (connection lost, exec refused). */
+  message?: string;
+  startedAt: number;
+  endedAt?: number;
+  output?: string;
+  /** The start of the output was dropped to keep it within limits. */
+  truncated?: boolean;
 }
 
 export type SshForwardType = "local" | "remote" | "dynamic";
@@ -122,6 +158,9 @@ export interface SshState {
   keys: SshKeyView[];
   identities: SshIdentityView[];
   snippets: SshSnippet[];
+  tasks: SshTask[];
+  /** The latest run of each task, without its output. */
+  taskRuns: SshTaskRun[];
   forwards: SshForward[];
   forwardStates: SshForwardState[];
   knownHosts: SshKnownHost[];

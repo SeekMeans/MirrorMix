@@ -423,6 +423,9 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
               ? options.readDesktopStream?.(options.desktopSession?.(runtime.id)?.title || runtime.title || session.title) ?? ""
               : "";
           if (runtime && session.title && runtime.status !== "starting") runtime.title = session.title;
+          // A message sent from this page keeps the row "running" until its reply is seen in the transcript. That check
+          // used to happen only when the conversation was opened, so a finished reply stayed "running" on the list.
+          if (runtime?.pendingTurn) viewOf(runtime);
           const stale =
             session.working && runtime?.pty && runtime.filePath
               ? currentRound(runtime, readSession(runtime.tool, runtime.filePath, options.roots.cursorStateDb))?.turnComplete === true

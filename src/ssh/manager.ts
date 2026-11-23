@@ -1,14 +1,44 @@
+import { randomUUID } from "node:crypto";
 import net from "node:net";
 import path from "node:path/posix";
 import type { Readable, Writable } from "node:stream";
 import type { Client, ClientChannel, SFTPWrapper } from "ssh2";
-import type { SftpEntry, SshForwardState, SshSessionInfo } from "../shared/ssh";
+import type { SftpEntry, SshForwardState, SshSessionInfo, SshTaskRun } from "../shared/ssh";
 import { createTerminalHub, type ShellProcess, type TerminalSink } from "../server/terminals";
 import { SshError, type SshStore, type SshTarget } from "./store";
 
 export type Connect = (target: SshTarget) => Promise<Client>;
 
 const SFTP_IDLE_MS = 5 * 60_000;
+/** Output kept per run: the latest part, so a long build still shows how it ended. */
+const TASK_OUTPUT_LIMIT = 400_000;
+/** Runs remembered per task, newest first. */
+const TASK_RUNS_KEPT = 10;
+
+/** A folder for the remote shell: quoted, with a leading "~" kept as the home folder. */
+export function remoteDir(dir: string): string {
+  const quote = (value: string) => `'${value.replace(/'/g, `'\\''`)}'`;
+  if (dir === "~") return '"$HOME"';
+  if (dir.startsWith("~/")) return `"$HOME"/${quote(dir.slice(2))}`;
+  return quote(dir);
+}
+
+/**
+ * What the host runs for a task: into the task's folder first, stopping if it is not there, then the snippet, so
+ * every path in the snippet is relative to that folder.
+ *
+ * A Windows snippet is PowerShell, while the shell OpenSSH starts on Windows is often cmd: it goes to
+ * powershell.exe as an encoded command, which arrives intact whatever that shell is.
+ */
+export function taskScript(dir: string, command: string, kind?: "linux" | "windows" | "python"): string {
+  const body = command.replace(/\r\n/g, "\n").replace(/\n+$/, "");
+  if (kind === "windows") {
+    const into = dir ? `Set-Location -Path '${dir.replace(/'/g, "''")}' -ErrorAction Stop\n` : "";
+    const script = `$ErrorActionPreference = 'Stop'\n$ProgressPreference = 'SilentlyContinue'\n[Console]::OutputEncoding = [Text.Encoding]::UTF8\n${into}${body}\n`;
+    return `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ${Buffer.from(script, "utf16le").toString("base64")}`;
+  }
+  return dir ? `cd ${remoteDir(dir)} || exit 1\n${body}\n` : `${body}\n`;
+}
 
 /** One SSH shell, shaped like a local command line so the terminal hub can keep it alive for the page. */
 function shellProcess(client: Client, stream: ClientChannel, backspace: "del" | "bs"): ShellProcess {
@@ -299,6 +329,86 @@ export function createSshManager(store: SshStore, connect: Connect) {
     },
   };
 
+  // ---------- tasks ----------
+  const taskRuns = new Map<string, SshTaskRun[]>();
+  const live = new Map<string, { client: Client; channel?: ClientChannel; stopped?: boolean }>();
+  const findRun = (runId: string): SshTaskRun => {
+    for (const runs of taskRuns.values()) {
+      const run = runs.find((item) => item.id === runId);
+      if (run) return run;
+    }
+    throw new SshError("unknown_run", 404);
+  };
+
+  /** Connects (so an unknown host key is asked about first), then runs the task's snippet in its folder. */
+  const runTask = async (taskId: string): Promise<SshTaskRun> => {
+    const task = store.task(taskId);
+    if (taskRuns.get(taskId)?.[0]?.state === "running") throw new SshError("task_running", 409);
+    const snippet = store.snippet(task.snippetId);
+    const client = await connect(store.target(task.hostId));
+    store.touchHost(task.hostId);
+    const run: SshTaskRun = { id: randomUUID(), taskId, state: "running", startedAt: Date.now(), output: "" };
+    taskRuns.set(taskId, [run, ...(taskRuns.get(taskId) ?? [])].slice(0, TASK_RUNS_KEPT));
+    const handle: { client: Client; channel?: ClientChannel; stopped?: boolean } = { client };
+    live.set(run.id, handle);
+    const append = (chunk: Buffer) => {
+      const next = (run.output ?? "") + chunk.toString("utf8");
+      if (next.length > TASK_OUTPUT_LIMIT) {
+        run.output = next.slice(next.length - TASK_OUTPUT_LIMIT);
+        run.truncated = true;
+      } else run.output = next;
+    };
+    let exitCode: number | undefined;
+    const finish = (message?: string) => {
+      if (run.state !== "running") return;
+      live.delete(run.id);
+      run.endedAt = Date.now();
+      if (exitCode !== undefined) run.exitCode = exitCode;
+      if (handle.stopped) run.state = "stopped";
+      else if (message) {
+        run.state = "failed";
+        run.message = message;
+      } else run.state = exitCode === 0 ? "ok" : "failed";
+      try {
+        client.end();
+      } catch {
+        /* already closed */
+      }
+    };
+    client.on("error", () => finish("连接断开了"));
+    client.on("close", () => finish("连接断开了"));
+    client.exec(taskScript(task.dir, snippet.command, snippet.kind), (error, channel) => {
+      if (error) return finish("对方没有执行这条命令");
+      handle.channel = channel;
+      channel.on("data", append);
+      channel.stderr.on("data", append);
+      channel.on("exit", (code: number | null) => {
+        if (typeof code === "number") exitCode = code;
+      });
+      channel.on("close", () => finish(exitCode === undefined && !handle.stopped ? "命令没有给出退出码就结束了" : undefined));
+    });
+    return { ...run, output: undefined };
+  };
+
+  const stopTaskRun = (runId: string): SshTaskRun => {
+    const run = findRun(runId);
+    const handle = live.get(runId);
+    if (handle) {
+      handle.stopped = true;
+      try {
+        handle.channel?.signal("KILL");
+      } catch {
+        /* not every server takes signals; closing the connection ends it */
+      }
+      try {
+        handle.client.end();
+      } catch {
+        /* already closed */
+      }
+    }
+    return run;
+  };
+
   // ---------- port forwarding ----------
   const forwards = new Map<string, ForwardRun>();
   const stateOf = (id: string): SshForwardState => forwards.get(id)?.state ?? { id, state: "off", connections: 0 };
@@ -403,6 +513,10 @@ export function createSshManager(store: SshStore, connect: Connect) {
       return {
         ...saved,
         forwardStates: saved.forwards.map((forward) => stateOf(forward.id)),
+        taskRuns: saved.tasks.flatMap((task) => {
+          const latest = taskRuns.get(task.id)?.[0];
+          return latest ? [{ ...latest, output: undefined }] : [];
+        }),
         sessions: [...sessions.values()],
       };
     },
@@ -431,17 +545,33 @@ export function createSshManager(store: SshStore, connect: Connect) {
       client.end();
     },
     sftp,
+    runTask,
+    stopTaskRun,
+    /** One run with its output so far. */
+    taskRun(runId: string): SshTaskRun {
+      return { ...findRun(runId) };
+    },
+    /** The runs of a task, newest first, without output. */
+    taskHistory(taskId: string): SshTaskRun[] {
+      return (taskRuns.get(taskId) ?? []).map((run) => ({ ...run, output: undefined }));
+    },
+    forgetTask(taskId: string) {
+      for (const run of taskRuns.get(taskId) ?? []) if (run.state === "running") stopTaskRun(run.id);
+      taskRuns.delete(taskId);
+    },
     startForward,
     stopForward,
     forgetHost(hostId: string) {
       for (const session of [...sessions.values()]) if (session.hostId === hostId) this.closeSession(session.tid);
       for (const forward of store.state().forwards) if (forward.hostId === hostId) stopForward(forward.id);
+      for (const task of store.state().tasks) if (task.hostId === hostId) this.forgetTask(task.id);
       dropSftp(hostId);
     },
     dispose() {
       clearTimeout(autoStart);
       hub.dispose();
       for (const id of [...forwards.keys()]) stopForward(id);
+      for (const id of [...live.keys()]) stopTaskRun(id);
       for (const hostId of [...sftpPool.keys()]) dropSftp(hostId);
     },
   };

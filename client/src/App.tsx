@@ -9,8 +9,9 @@ import { workspaceTerminalKey } from "../../src/shared/terminalScope";
 import { ModelChip } from "./ModelChip";
 import { FileBrowser } from "./FileBrowser";
 import { Composer, MessageList } from "./Conversation";
-import { BackIcon, ChatsIcon, GearIcon, MenuIcon, PuzzleIcon, PushpinIcon, Spinner, TrashIcon, WorkbenchIcon } from "./icons";
+import { BackIcon, ChatsIcon, FlowIcon, GearIcon, MenuIcon, PuzzleIcon, PushpinIcon, Spinner, TrashIcon, WorkbenchIcon } from "./icons";
 import { PluginsDialog, type PluginId } from "./Plugins";
+import { Workflows } from "./Workflows";
 import { SettingsDialog, type MenuPage, type Section } from "./Settings";
 import { Sidebar, type RailView } from "./Sidebar";
 import { TodayStats } from "./TodayStats";
@@ -21,7 +22,7 @@ import { useMobile } from "./useMobile";
 import { useSession, type SessionState } from "./useSession";
 
 /** On a phone one screen shows at a time. The conversation is pushed on top of the list and has no tab bar. */
-type Screen = "list" | "chat" | "plugins" | "settings";
+type Screen = "list" | "chat" | "plugins" | "settings" | "workflows";
 
 type Tone = "busy" | "ready" | "working" | "attention" | "off";
 
@@ -99,6 +100,8 @@ export function App({ onLogout }: { onLogout?: () => void }) {
   const [prefs, setPrefs] = useState<ToolPrefs | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [pluginsOpen, setPluginsOpen] = useState(false);
+  // Desktop: 工作流 open beside the bar, in place of the session list and conversation.
+  const [workflowsOpen, setWorkflowsOpen] = useState(false);
   const [checking, setChecking] = useState(false);
   const [checkedAt, setCheckedAt] = useState<Date | null>(null);
   const [settingsError, setSettingsError] = useState("");
@@ -275,6 +278,7 @@ export function App({ onLogout }: { onLogout?: () => void }) {
   );
   const openMarket = useCallback(() => {
     if (mobile) setPluginsOpen(false);
+      setWorkflowsOpen(false);
     setSettingsStart("market");
     if (mobile) setScreen("settings");
     else setSettingsOpen(true);
@@ -387,6 +391,7 @@ export function App({ onLogout }: { onLogout?: () => void }) {
   const switchTool = useCallback(
     (next: ToolId) => {
       setPluginsOpen(false);
+      setWorkflowsOpen(false);
       setRailView("tool");
       if (next === toolRef.current) return;
       setTool(next);
@@ -398,12 +403,14 @@ export function App({ onLogout }: { onLogout?: () => void }) {
 
   const showRunning = useCallback(() => {
     setPluginsOpen(false);
+      setWorkflowsOpen(false);
     setRailView("running");
     clear();
   }, [clear]);
 
   const showPinned = useCallback(() => {
     setPluginsOpen(false);
+      setWorkflowsOpen(false);
     setRailView("pinned");
   }, []);
 
@@ -644,7 +651,7 @@ export function App({ onLogout }: { onLogout?: () => void }) {
   );
 
   return (
-    <div className={`shell${railOpen && !mobile ? " rail-shown" : ""}${mobile ? ` is-mobile on-${screen}` : ""}${!mobile && pluginsOpen ? " on-plugins" : ""}`}>
+    <div className={`shell${railOpen && !mobile ? " rail-shown" : ""}${mobile ? ` is-mobile on-${screen}` : ""}${!mobile && (pluginsOpen || workflowsOpen) ? " on-plugins" : ""}`}>
       {listShown && (
       <Sidebar
         mobile={mobile}
@@ -662,8 +669,16 @@ export function App({ onLogout }: { onLogout?: () => void }) {
         tools={shownTools}
         offlineTools={offlineTools}
         onSettings={openSettings}
-        onPlugins={() => setPluginsOpen(true)}
+        onPlugins={() => {
+          setWorkflowsOpen(false);
+          setPluginsOpen(true);
+        }}
         pluginsActive={!mobile && pluginsOpen}
+        onWorkflows={() => {
+          setPluginsOpen(false);
+          setWorkflowsOpen(true);
+        }}
+        workflowsActive={!mobile && workflowsOpen}
         onLogout={onLogout}
         onRunning={showRunning}
         pinned={prefs?.pinned ?? []}
@@ -684,7 +699,21 @@ export function App({ onLogout }: { onLogout?: () => void }) {
         </main>
       )}
 
-      {conversationShown && !(!mobile && pluginsOpen) && (
+      {!mobile && workflowsOpen && (
+        <main className="conversation plugin-page">
+          <Workflows
+            variant="desk"
+            catalog={catalog}
+            tools={shownTools}
+            onOpenSession={(item, id) => {
+              setWorkflowsOpen(false);
+              chooseIn(item, id);
+            }}
+          />
+        </main>
+      )}
+
+      {conversationShown && !(!mobile && (pluginsOpen || workflowsOpen)) && (
       <main className="conversation">
         {!target && (
           <div className="welcome">
@@ -926,6 +955,8 @@ export function App({ onLogout }: { onLogout?: () => void }) {
         <PluginsDialog key={pluginStart ?? "list"} variant="page" startWith={pluginStart} installed={installed} context={{ jobs, placeOf, mobile: true }} onOpenMarket={openMarket} onClose={leavePlugins} />
       )}
 
+      {mobile && screen === "workflows" && <Workflows variant="page" catalog={catalog} tools={shownTools} onOpenSession={chooseIn} />}
+
       {mobile && screen === "settings" && (
         <SettingsDialog
           key={settingsStart ?? "settings"}
@@ -966,6 +997,7 @@ export function App({ onLogout }: { onLogout?: () => void }) {
                     setScreen("list");
                   } else if (key === "sessions") {
                     setPluginsOpen(false);
+      setWorkflowsOpen(false);
                     // 会话 comes back to the tab last used inside it: 钉住 or a tool.
                     setRailView(sessionsView.current);
                     setScreen("list");
@@ -1014,6 +1046,7 @@ export function App({ onLogout }: { onLogout?: () => void }) {
 const TABS = [
   { key: "home", label: "工作台", Icon: () => <WorkbenchIcon /> },
   { key: "sessions", label: "会话", Icon: ChatsIcon },
+  { key: "workflows", label: "工作流", Icon: () => <FlowIcon size={22} /> },
   { key: "settings", label: "设置", Icon: GearIcon },
 ] as const;
 

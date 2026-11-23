@@ -61,6 +61,37 @@ export const CloseIcon = () => <Icon><path d="m4 4 8 8M12 4l-8 8" /></Icon>;
 export const MenuIcon = () => <Icon size={18}><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" /></Icon>;
 export const DownIcon = () => <Icon><path d="M8 3v9.5M4 8.8l4 4 4-4" /></Icon>;
 export const SendIcon = () => <Icon><path d="M8 13V3.5M4 7.2l4-4 4 4" /></Icon>;
+/** 工作流: three blocks joined top to bottom, the middle one branching. */
+export const FlowIcon = ({ size = 16 }: { size?: number }) => (
+  <Icon size={size}>
+    <rect x="5.4" y="1.8" width="5.2" height="3.2" rx="1" />
+    <rect x="1.8" y="11" width="5.2" height="3.2" rx="1" />
+    <rect x="9" y="11" width="5.2" height="3.2" rx="1" />
+    <path d="M8 5v2.8M4.4 11V9.4a1.6 1.6 0 0 1 1.6-1.6h4a1.6 1.6 0 0 1 1.6 1.6V11" />
+  </Icon>
+);
+/** 模型: a chip. */
+export const ModelIcon = () => (
+  <Icon>
+    <rect x="4" y="4" width="8" height="8" rx="1.6" />
+    <path d="M6.5 6.5h3v3h-3zM6 1.8V4M10 1.8V4M6 12v2.2M10 12v2.2M1.8 6H4M1.8 10H4M12 6h2.2M12 10h2.2" />
+  </Icon>
+);
+export const PlayIcon = () => (
+  <Icon>
+    <path d="M5 3.4v9.2a.5.5 0 0 0 .76.43l7.3-4.6a.5.5 0 0 0 0-.86l-7.3-4.6A.5.5 0 0 0 5 3.4z" />
+  </Icon>
+);
+export const StopIcon = () => (
+  <Icon>
+    <rect x="4" y="4" width="8" height="8" rx="1.4" />
+  </Icon>
+);
+export const DragIcon = () => (
+  <Icon>
+    <path d="M6 4h.01M10 4h.01M6 8h.01M10 8h.01M6 12h.01M10 12h.01" strokeWidth="2.2" />
+  </Icon>
+);
 export const PuzzleIcon = () => (
   <Icon>
     <path d="M6.2 2.6a1.5 1.5 0 0 1 3 0v1H12a.8.8 0 0 1 .8.8v2.4h-.9a1.5 1.5 0 0 0 0 3h.9v2.4a.8.8 0 0 1-.8.8H9.6v-.9a1.5 1.5 0 0 0-3 0v.9H4a.8.8 0 0 1-.8-.8V9.8h.9a1.5 1.5 0 0 0 0-3h-.9V4.4a.8.8 0 0 1 .8-.8h2.2z" />

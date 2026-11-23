@@ -51,6 +51,8 @@ export interface TranscriptMessage {
   startedAt?: string;
   endedAt?: string;
   tokens?: number;
+  /** On a turn: closed because its last tool call went past its own time limit with no result and no other record. */
+  stalled?: { tool: string; limitMs: number };
 }
 
 export interface SessionSummary {
@@ -312,6 +314,22 @@ async function saveSettings(change: { tools: ToolId[] } | { pinned: string[] }):
 }
 
 export type { Shortcut, ShortcutLibrary } from "../../src/shared/shortcuts";
+export type {
+  Workflow,
+  WorkflowStep,
+  WorkflowCondition,
+  WorkflowRun,
+  RunSummary,
+  StepRun,
+  AiStep,
+  ModelStep,
+  CommandStep,
+  IfStep,
+  LoopStep,
+} from "../../src/workflow/types";
+import type { Workflow, WorkflowRun, RunSummary } from "../../src/workflow/types";
+export type { ModelView } from "../../src/models/modelStore";
+import type { ModelView } from "../../src/models/modelStore";
 import type { Shortcut, ShortcutLibrary } from "../../src/shared/shortcuts";
 
 /** A command kept in Settings. once: runs to the end. service: keeps running (a dev server) until stopped. */
@@ -366,6 +384,22 @@ async function upload(file: Blob, name: string): Promise<Upload> {
 
 export const api = {
   upload,
+  models: () => request<{ models: ModelView[] }>("/api/models"),
+  saveModel: (model: Record<string, unknown>, id?: string) =>
+    request<ModelView>(id ? `/api/models/${id}` : "/api/models", { method: id ? "PUT" : "POST", body: JSON.stringify(model) }),
+  deleteModel: (id: string) => request<{ ok: true }>(`/api/models/${id}`, { method: "DELETE" }),
+  testModel: (id: string) =>
+    request<{ ok: true; reply: string; ms: number } | { ok: false; message: string; reply?: undefined; ms?: undefined }>(`/api/models/${id}/test`, { method: "POST" }),
+  writeScript: (id: string, input: { kind: "linux" | "windows" | "python"; description: string; current?: string }) =>
+    request<{ ok: true; label: string; command: string } | { ok: false; message: string }>(`/api/models/${id}/script`, { method: "POST", body: JSON.stringify(input) }),
+  workflows: () => request<{ workflows: Workflow[] }>("/api/workflows"),
+  saveWorkflow: (flow: Partial<Workflow>, id?: string) =>
+    request<Workflow>(id ? `/api/workflows/${id}` : "/api/workflows", { method: id ? "PUT" : "POST", body: JSON.stringify(flow) }),
+  deleteWorkflow: (id: string) => request<{ ok: true }>(`/api/workflows/${id}`, { method: "DELETE" }),
+  runWorkflow: (id: string, input: string) => request<WorkflowRun>(`/api/workflows/${id}/run`, { method: "POST", body: JSON.stringify({ input }) }),
+  workflowRuns: (id: string) => request<{ runs: RunSummary[] }>(`/api/workflows/${id}/runs`),
+  workflowRun: (runId: string) => request<WorkflowRun>(`/api/workflows/runs/${runId}`),
+  stopWorkflowRun: (runId: string) => request<WorkflowRun>(`/api/workflows/runs/${runId}/stop`, { method: "POST" }),
   commands: () => request<ShortcutLibrary>("/api/commands"),
   saveCommands: (commands: Shortcut[], revision: string) => request<ShortcutLibrary>("/api/commands", { method: "PUT", body: JSON.stringify({ commands, revision }) }),
   prepareCommand: (entry: Shortcut, revision: string, message?: string) => request<{ command: string }>("/api/commands/prepare", { method: "POST", body: JSON.stringify({ group: entry.group, name: entry.name, revision, message }) }),

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ALL_TOOLS, type ToolId, type ToolPrefs } from "./api";
 import { HelpContent } from "./Help";
+import { ModelManager } from "./Models";
 import {
   BackIcon,
   ChevronIcon,
@@ -11,6 +12,7 @@ import {
   HelpIcon,
   LeaveIcon,
   Mark,
+  ModelIcon,
   PuzzleIcon,
   SlidersIcon,
   Spinner,
@@ -22,21 +24,23 @@ import { toolName } from "./text";
 import { PLUGINS, PluginMarket, type PluginId } from "./Plugins";
 import { THEME_LABEL, useTheme, type Theme } from "./theme";
 
-export type Section = "general" | "market" | "help";
+export type Section = "general" | "models" | "market" | "help";
 
 const HEADINGS: Record<Section, { title: string; lead: string }> = {
   general: { title: "通用设置", lead: "选择要显示的 AI 工具，查看它们在本机是否开启，选择浅色或深色，设置外网访问。" },
+  models: { title: "模型管理", lead: "" },
   market: { title: "插件市场", lead: "把需要的插件添加到“我的插件”，从左下角的菜单打开使用。" },
   help: { title: "帮助", lead: "MirrorMix 每个功能怎么用，以及常见问题。" },
 };
 
 /** On a phone, settings open as a menu; each entry is a page of its own. */
-export type MenuPage = "tools" | "appearance" | "remote" | "market" | "help";
+export type MenuPage = "tools" | "appearance" | "remote" | "models" | "market" | "help";
 
 const PAGES: Record<MenuPage, { title: string; lead: string; Icon: () => ReactNode }> = {
   tools: { title: "AI 工具", lead: "", Icon: SlidersIcon },
   appearance: { title: "外观", lead: "选择浅色或深色。只影响这个浏览器，手机和电脑可以各选各的。", Icon: ContrastIcon },
   remote: { title: "外网访问", lead: "", Icon: GlobeIcon },
+  models: { title: HEADINGS.models.title, lead: HEADINGS.models.lead, Icon: ModelIcon },
   market: { title: HEADINGS.market.title, lead: "把需要的插件添加到“我的插件”，在底部的“插件”页打开使用。", Icon: StoreIcon },
   help: { title: HEADINGS.help.title, lead: HEADINGS.help.lead, Icon: HelpIcon },
 };
@@ -258,6 +262,7 @@ export function SettingsDialog({
         : "正在读取",
       appearance: THEME_LABEL[theme],
       remote: "从手机或别的电脑打开",
+      models: "工作流可以调用的模型",
       market: installed ? `已添加 ${installed.length} / ${PLUGINS.length} 个插件` : "正在读取",
       help: "功能说明和常见问题",
     };
@@ -286,7 +291,9 @@ export function SettingsDialog({
                   ? remote
                   : sub === "market"
                     ? market
-                    : <HelpContent />}
+                    : sub === "models"
+                      ? <ModelManager />
+                      : <HelpContent />}
           </div>
         </section>
       );
@@ -376,7 +383,7 @@ export function SettingsDialog({
           )}
 
           <div className="pref-group">
-            {(["help"] as MenuPage[]).map((key) => {
+            {(["models", "help"] as MenuPage[]).map((key) => {
               const { title, Icon } = PAGES[key];
               return (
                 <button key={key} type="button" className="pref-row" onClick={() => openSub(key)}>
@@ -401,6 +408,8 @@ export function SettingsDialog({
     <div className="settings-body">
       {section === "help" ? (
         <HelpContent />
+      ) : section === "models" ? (
+        <ModelManager />
       ) : section === "market" ? (
         market
       ) : (
@@ -440,6 +449,7 @@ export function SettingsDialog({
             <span>MirrorMix</span>
           </div>
           {tab("general", SlidersIcon, "通用设置")}
+          {tab("models", ModelIcon, "模型管理")}
           {tab("help", HelpIcon, "帮助")}
         </nav>
 
@@ -447,7 +457,7 @@ export function SettingsDialog({
           <header className="settings-head">
             <div>
               <h2 id="settings-title">{HEADINGS[section].title}</h2>
-              <p>{HEADINGS[section].lead}</p>
+              {HEADINGS[section].lead && <p>{HEADINGS[section].lead}</p>}
             </div>
             <button type="button" className="icon-button" aria-label="关闭设置" ref={closeButton} onClick={onClose}>
               <CloseIcon />

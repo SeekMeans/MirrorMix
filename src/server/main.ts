@@ -32,6 +32,9 @@ import { resolveClaudeDataDir } from "../catalog/claudeData";
 import { resolveConnectionMode } from "../settings/connectionMode";
 import { createApp, listenLocal, type PageServer } from "./app";
 import { createCommandTasks } from "../tasks/commandTasks";
+import { createWorkflowEngine } from "../workflow/engine";
+import { supervisorAi } from "../workflow/aiBridge";
+import { createModelStore } from "../models/modelStore";
 import { verifyWindowsLogin } from "./windowsLogin";
 import { createPreview, htmlFileAt, htmlFilesIn, listeningPorts } from "./preview";
 
@@ -269,6 +272,8 @@ const pages: PageServer | undefined = dev
     }
   : undefined;
 // The SSH plugin: hosts, keychain and known hosts in ~/.mirrormix/ssh.json, secrets sealed with DPAPI.
+// 模型管理: models reached by API (DeepSeek, 通义千问…), keys sealed with DPAPI like the SSH secrets.
+const modelStore = createModelStore(path.join(home, ".mirrormix", "models.json"), dpapiBox());
 const sshStore = createSshStore(path.join(home, ".mirrormix", "ssh.json"), dpapiBox(), sshKeyTools);
 const sshPlugin = { store: sshStore, manager: createSshManager(sshStore, (target) => connectTarget(target, sshStore)) };
 const server = createApp(supervisor, settings, {
@@ -311,7 +316,13 @@ const server = createApp(supervisor, settings, {
   htmlFiles: (root) => htmlFilesIn(root),
   htmlFile: (root, relative) => htmlFileAt(root, relative),
   origin: (throughTunnel) => (throughTunnel ? remote.previewOrigin() : `http://127.0.0.1:${previewPort}`),
-}, pages, undefined, undefined, createCommandTasks(path.join(home, ".mirrormix")), undefined, sshPlugin);
+}, pages, undefined, undefined, createCommandTasks(path.join(home, ".mirrormix")), undefined, sshPlugin,
+  createWorkflowEngine({
+    dir: path.join(home, ".mirrormix"),
+    ai: supervisorAi(supervisor),
+    model: ({ modelId, system, prompt, json, timeoutMs, signal }) =>
+      modelStore.chat(modelId, [...(system ? [{ role: "system" as const, content: system }] : []), { role: "user", content: prompt }], { json, timeoutMs, signal }),
+  }), modelStore);
 if (dev) {
   const { createServer } = await import("vite");
   const { default: react } = await import("@vitejs/plugin-react");

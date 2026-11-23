@@ -50,6 +50,8 @@ export interface TranscriptMessage {
   startedAt?: string;
   endedAt?: string;
   tokens?: number;
+  /** On a turn: closed because its last tool call went past its own time limit with no result and no other record. */
+  stalled?: { tool: string; limitMs: number };
 }
 
 export interface ParsedSession {
@@ -68,6 +70,11 @@ export interface ParsedSession {
   idleSince?: string;
   /** An open round, tools still running or not: when it last did anything. */
   openActivityAt?: string;
+  /**
+   * An open round whose unfinished tool calls all have a time limit of their own (a shell command's timeout, say):
+   * the longest of them, and the step it belongs to. Past it with no record, the call is stuck (see settleAbandoned).
+   */
+  stallAfter?: { ms: number; tool: string };
   /** The model the session last used or was switched to, as the tool names it (`claude-opus-5-5`, `gpt-6.1-sol`). */
   model?: string;
   /** Codex's reasoning effort for that model (`low` … `xhigh`). */

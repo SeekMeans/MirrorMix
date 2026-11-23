@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ABANDONED_MS, parseClaudeJsonl, settleAbandoned, settleBeforeProcess } from "../src/transcript/claude";
+import { ABANDONED_MS, STALL_GRACE_MS, parseClaudeJsonl, settleAbandoned, settleBeforeProcess } from "../src/transcript/claude";
 
 const t0 = Date.parse("2026-11-17T13:30:00.000Z");
 const at = (seconds: number) => new Date(t0 + seconds * 1000).toISOString();
@@ -7,8 +7,8 @@ const line = (record: Record<string, unknown>) => JSON.stringify({ cwd: "E:\\wor
 const user = (content: unknown, seconds: number) => line({ type: "user", timestamp: at(seconds), message: { role: "user", content } });
 const text = (words: string, seconds: number) =>
   line({ type: "assistant", timestamp: at(seconds), message: { id: `m${seconds}`, role: "assistant", content: [{ type: "text", text: words }] } });
-const call = (id: string, seconds: number) =>
-  line({ type: "assistant", timestamp: at(seconds), message: { id: `m${seconds}`, role: "assistant", content: [{ type: "tool_use", id, name: "Read", input: { file_path: "a.ts" } }] } });
+const call = (id: string, seconds: number, name = "Read", input: Record<string, unknown> = { file_path: "a.ts" }) =>
+  line({ type: "assistant", timestamp: at(seconds), message: { id: `m${seconds}`, role: "assistant", content: [{ type: "tool_use", id, name, input }] } });
 const result = (id: string, seconds: number) => user([{ type: "tool_result", tool_use_id: id, content: "ok" }], seconds);
 
 describe("rounds that never got an end", () => {
@@ -31,12 +31,37 @@ describe("rounds that never got an end", () => {
     expect(settled.messages.filter((m) => m.role === "turn").every((m) => m.endedAt)).toBe(true);
   });
 
-  it("keeps waiting while a tool is still running, however long it takes", () => {
-    const content = [user("run the build", 0), call("t1", 2)].join("\n");
+  it("waits out a command's own timeout, then counts it as stuck", () => {
+    const content = [user("run the tests", 0), call("t1", 2, "Bash", { command: "pytest", timeout: 300_000 })].join("\n");
     const parsed = parseClaudeJsonl("s.jsonl", content, at(2))!;
     expect(parsed.turnComplete).toBe(false);
     expect(parsed.idleSince).toBeUndefined();
-    expect(settleAbandoned(parsed, t0 + 24 * 3_600_000).turnComplete).toBe(false);
+    expect(parsed.stallAfter).toEqual({ ms: 300_000, tool: "Bash" });
+    expect(settleAbandoned(parsed, t0 + 2000 + 300_000).turnComplete).toBe(false);
+
+    // Past the timeout and the grace, the round is over, flagged so the page can say why; the call is marked.
+    const settled = settleAbandoned(parsed, t0 + 2000 + 300_000 + STALL_GRACE_MS + 1);
+    expect(settled.turnComplete).toBe(true);
+    expect(settled.messages.find((m) => m.role === "turn")).toMatchObject({ endedAt: at(2), stalled: { tool: "Bash", limitMs: 300_000 } });
+    expect(settled.messages.find((m) => m.role === "step")?.result?.status).toBe("error");
+  });
+
+  it("gives a command without a timeout Claude Code's two minutes, and never more than ten", () => {
+    const plain = parseClaudeJsonl("s.jsonl", [user("go", 0), call("t1", 2, "Bash", { command: "ls" })].join("\n"), at(2))!;
+    expect(plain.stallAfter?.ms).toBe(120_000);
+    const huge = parseClaudeJsonl("s.jsonl", [user("go", 0), call("t1", 2, "PowerShell", { command: "x", timeout: 9e9 })].join("\n"), at(2))!;
+    expect(huge.stallAfter?.ms).toBe(600_000);
+  });
+
+  it("keeps waiting on a sub-agent or a question, however long they take", () => {
+    for (const [name, input] of [["Agent", { prompt: "dig" }], ["AskUserQuestion", { questions: [] }]] as const) {
+      const parsed = parseClaudeJsonl("s.jsonl", [user("go", 0), call("t1", 2, name, input)].join("\n"), at(2))!;
+      expect(parsed.stallAfter).toBeUndefined();
+      expect(settleAbandoned(parsed, t0 + 24 * 3_600_000).turnComplete).toBe(false);
+    }
+    // A command running beside a sub-agent does not end the round while the sub-agent is still at it.
+    const both = [user("go", 0), call("a1", 2, "Agent", { prompt: "dig" }), call("b1", 3, "Bash", { command: "ls" })].join("\n");
+    expect(parseClaudeJsonl("s.jsonl", both, at(3))!.stallAfter).toBeUndefined();
   });
 
   it("ends a round, running tool and all, that was left by a Claude Code process MirrorMix has since replaced", () => {

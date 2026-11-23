@@ -7,7 +7,7 @@ import { Server, utils } from "ssh2";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { plainBox } from "../src/settings/secrets";
 import { connectTarget, fingerprintOf, HostKeyError, sshKeyTools } from "../src/ssh/connect";
-import { createSshManager } from "../src/ssh/manager";
+import { createSshManager, taskScript } from "../src/ssh/manager";
 import { createSshStore, parseSshConfig } from "../src/ssh/store";
 
 const tempStore = () => {
@@ -102,6 +102,7 @@ let server: Server;
 let port = 0;
 let echoPort = 0;
 let echo: net.Server;
+const execs: string[] = [];
 
 beforeAll(async () => {
   echo = net.createServer((socket) => socket.pipe(socket));
@@ -119,6 +120,16 @@ beforeAll(async () => {
         const session = accept();
         session.on("pty", (acceptPty) => acceptPty?.());
         session.on("window-change", (acceptWindow) => acceptWindow?.());
+        // A command run without a terminal (a task): says what it got, writes to both streams, exits.
+        session.on("exec", (acceptExec, _rejectExec, info) => {
+          const stream = acceptExec();
+          execs.push(info.command);
+          stream.write(`ran:${info.command.split("\n").filter(Boolean).at(-1)}\n`);
+          stream.stderr.write("warn\n");
+          if (info.command.includes("sleep")) return;
+          stream.exit(info.command.includes("fail") ? 3 : 0);
+          stream.end();
+        });
         session.on("shell", (acceptShell) => {
           const stream = acceptShell();
           stream.write("welcome\r\n");
@@ -197,6 +208,58 @@ describe("SSH against a live server", () => {
     manager.closeSession(session.tid);
     expect(manager.state().sessions).toEqual([]);
     expect(store.state().hosts[0].lastConnectedAt).toEqual(expect.any(Number));
+    manager.dispose();
+  });
+
+  it("enters the task's folder before the snippet, in bash and in PowerShell", () => {
+    expect(taskScript("/opt/app", "./install.sh\n")).toBe("cd '/opt/app' || exit 1\n./install.sh\n");
+    expect(taskScript("", "ls")).toBe("ls\n");
+    const windows = taskScript("D:\\it's here", "Get-ChildItem", "windows");
+    expect(windows).toMatch(/^powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand [A-Za-z0-9+/=]+$/);
+    const script = Buffer.from(windows.split(" ").at(-1)!, "base64").toString("utf16le");
+    expect(script).toContain("Set-Location -Path 'D:\\it''s here' -ErrorAction Stop\nGet-ChildItem\n");
+    expect(script.indexOf("Set-Location")).toBeLessThan(script.indexOf("Get-ChildItem"));
+  });
+
+  it("runs a task's snippet in its folder, keeps the output and exit code, and can stop one", async () => {
+    const { store } = tempStore();
+    const host = store.saveHost({ label: "local", host: "127.0.0.1", port, username: "tester", auth: "password", password: "pw" });
+    store.trustHostKey(`127.0.0.1:${port}`, "ssh-rsa", serverFingerprint());
+    const deploy = store.saveSnippet({ label: "deploy", command: "git pull\n./install.sh\n" });
+    expect(deploy.updatedAt).toEqual(expect.any(Number));
+    expect(store.saveSnippet({ ...deploy, tags: ["部署"] })).toMatchObject({ createdAt: deploy.createdAt, tags: ["部署"] });
+    const task = store.saveTask({ name: "", hostId: host.id, dir: "~/my app's", snippetId: deploy.id, tags: ["部署", " 生产 ", "部署"] });
+    expect(task.name).toBe("deploy @ local");
+    expect(task.tags).toEqual(["部署", "生产"]);
+    expect(() => store.deleteSnippet(deploy.id)).toThrow("snippet_in_use");
+
+    const manager = createSshManager(store, (target) => connectTarget(target, store));
+    const started = await manager.runTask(task.id);
+    expect(started).toMatchObject({ taskId: task.id, state: "running" });
+    await expect(manager.runTask(task.id)).rejects.toThrow("task_running");
+    for (let tries = 0; tries < 50 && manager.taskRun(started.id).state === "running"; tries += 1) await new Promise((resolve) => setTimeout(resolve, 50));
+    const done = manager.taskRun(started.id);
+    expect(done).toMatchObject({ state: "ok", exitCode: 0 });
+    expect(done.output).toContain("ran:./install.sh");
+    expect(done.output).toContain("warn");
+    expect(execs.at(-1)).toBe(`cd "$HOME"/'my app'\\''s' || exit 1\ngit pull\n./install.sh\n`);
+    expect(manager.state().taskRuns).toEqual([expect.objectContaining({ id: started.id, state: "ok" })]);
+    expect(manager.state().taskRuns[0].output).toBeUndefined();
+
+    // A failing command keeps its exit code.
+    const failing = store.saveTask({ name: "坏的", hostId: host.id, dir: "/srv", snippetId: store.saveSnippet({ label: "x", command: "fail" }).id });
+    const bad = await manager.runTask(failing.id);
+    for (let tries = 0; tries < 50 && manager.taskRun(bad.id).state === "running"; tries += 1) await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(manager.taskRun(bad.id)).toMatchObject({ state: "failed", exitCode: 3 });
+
+    // One that never ends can be stopped.
+    const slow = store.saveTask({ name: "慢", hostId: host.id, dir: "", snippetId: store.saveSnippet({ label: "s", command: "sleep 100" }).id });
+    const running = await manager.runTask(slow.id);
+    for (let tries = 0; tries < 50 && execs.at(-1) !== "sleep 100\n"; tries += 1) await new Promise((resolve) => setTimeout(resolve, 50));
+    manager.stopTaskRun(running.id);
+    for (let tries = 0; tries < 50 && manager.taskRun(running.id).state === "running"; tries += 1) await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(manager.taskRun(running.id).state).toBe("stopped");
+    expect(execs.at(-1)).toBe("sleep 100\n");
     manager.dispose();
   });
 

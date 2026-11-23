@@ -110,6 +110,18 @@ export async function handleSshRequest(
     if (route === "snippets" && method === "POST") return send(response, 200, store.saveSnippet(await body(request))), true;
     if (route === "snippets" && method === "DELETE") return store.deleteSnippet(query("id")), send(response, 200, { ok: true }), true;
 
+    // tasks
+    if (route === "tasks" && method === "POST") return send(response, 200, store.saveTask(await body(request))), true;
+    if (route === "tasks" && method === "DELETE") {
+      manager.forgetTask(query("id"));
+      store.deleteTask(query("id"));
+      return send(response, 200, { ok: true }), true;
+    }
+    if (route === "tasks/run" && method === "POST") return send(response, 200, await manager.runTask(text((await body(request)).id))), true;
+    if (route === "tasks/runs" && method === "GET") return send(response, 200, { runs: manager.taskHistory(query("task")) }), true;
+    if (route === "tasks/run" && method === "GET") return send(response, 200, manager.taskRun(query("id"))), true;
+    if (route === "tasks/stop" && method === "POST") return send(response, 200, manager.stopTaskRun(text((await body(request)).id))), true;
+
     // port forwarding
     if (route === "forwards" && method === "POST") return send(response, 200, store.saveForward(await body(request))), true;
     if (route === "forwards" && method === "DELETE") {

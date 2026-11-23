@@ -37,13 +37,38 @@ function isTaskNotification(text: string): boolean {
 /** How long an open round may go without any record, with no tool still running, before it counts as abandoned. */
 export const ABANDONED_MS = 10 * 60_000;
 
+/** Slack past a tool's own limit: Claude Code writes the result a moment after the command stops. */
+export const STALL_GRACE_MS = 60_000;
+/** Claude Code's own Bash and PowerShell timeouts: 2 minutes unless the call asks for more, 10 at most. */
+const SHELL_DEFAULT_MS = 120_000;
+const SHELL_MAX_MS = 600_000;
+/** Reading, editing, searching, fetching, MCP calls: they answer within minutes. */
+const OTHER_TOOL_MS = 10 * 60_000;
+
+/**
+ * How long a call can take by its own rules before it has to answer, or null when nothing bounds it: a sub-agent
+ * works as long as its task needs, and a question waits on the person.
+ */
+export function callLimitMs(name: string, input: unknown): number | null {
+  const args = (input ?? {}) as { timeout?: unknown; run_in_background?: unknown };
+  if (name === "Bash" || name === "PowerShell") {
+    // A background command answers at once; it is the task list that follows it.
+    if (args.run_in_background === true) return 0;
+    const asked = typeof args.timeout === "number" && args.timeout > 0 ? args.timeout : SHELL_DEFAULT_MS;
+    return Math.min(asked, SHELL_MAX_MS);
+  }
+  if (name === "Agent" || name === "Task" || name === "AskUserQuestion" || name === "ExitPlanMode" || /__(start_session|hand_off_to_session)$/.test(name)) return null;
+  return OTHER_TOOL_MS;
+}
+
 /**
  * A round whose Claude Code went away mid-request (the process was stopped, MirrorMix restarted under it) never
  * gets an end in the transcript. Replies stream records as they come and a running tool keeps its call open, so a
  * round with neither for this long is over. Applied on each read, since parsed transcripts are cached by file time.
  */
 export function settleAbandoned(parsed: ParsedSession, now = Date.now()): ParsedSession {
-  if (parsed.turnComplete || !parsed.idleSince) return parsed;
+  if (parsed.turnComplete) return parsed;
+  if (!parsed.idleSince) return settleStalled(parsed, now);
   const since = Date.parse(parsed.idleSince);
   if (!Number.isFinite(since) || now - since < ABANDONED_MS) return parsed;
   return {
@@ -52,6 +77,26 @@ export function settleAbandoned(parsed: ParsedSession, now = Date.now()): Parsed
     messages: parsed.messages.map((message) =>
       message.role === "turn" && !message.endedAt ? { ...message, endedAt: parsed.idleSince } : message,
     ),
+  };
+}
+
+/**
+ * A round whose tool calls are past their own time limit with no result and no other record: the call is stuck (or
+ * its process went away). Over, its unfinished calls marked, the turn flagged so the page can say the next message
+ * carries on.
+ */
+function settleStalled(parsed: ParsedSession, now: number): ParsedSession {
+  const last = parsed.openActivityAt ? Date.parse(parsed.openActivityAt) : NaN;
+  const limit = parsed.stallAfter;
+  if (!limit || !Number.isFinite(last) || now - last < limit.ms + STALL_GRACE_MS) return parsed;
+  return {
+    ...parsed,
+    turnComplete: true,
+    messages: parsed.messages.map((message) => {
+      if (message.role === "turn" && !message.endedAt) return { ...message, endedAt: parsed.openActivityAt, stalled: { tool: limit.tool, limitMs: limit.ms } };
+      if (message.role === "step" && message.result?.status === "running") return { ...message, result: { status: "error" as const, summary: "超时没有结果" } };
+      return message;
+    }),
   };
 }
 
@@ -318,6 +363,17 @@ export function parseClaudeJsonl(fileName: string, content: string, updatedAt: s
   // Waiting on nothing: every tool call has its result, yet no reply has come.
   const idleSince = !turnComplete && calls.size === 0 && lastActivity ? lastActivity : undefined;
   const openActivityAt = !turnComplete && lastActivity ? lastActivity : undefined;
+  let stallAfter: { ms: number; tool: string } | undefined;
+  if (!turnComplete && calls.size) {
+    for (const call of calls.values()) {
+      const ms = callLimitMs(call.name, call.input);
+      if (ms === null) {
+        stallAfter = undefined;
+        break;
+      }
+      if (!stallAfter || ms >= stallAfter.ms) stallAfter = { ms, tool: messages[call.at]?.tool ?? call.name };
+    }
+  }
   const open = round as Round | null;
   if (open && turnComplete) closeRound();
   else if (open) {
@@ -333,6 +389,7 @@ export function parseClaudeJsonl(fileName: string, content: string, updatedAt: s
     ...(interruptedAt === undefined ? {} : { interruptedAt }),
     ...(idleSince ? { idleSince } : {}),
     ...(openActivityAt ? { openActivityAt } : {}),
+    ...(stallAfter ? { stallAfter } : {}),
     ...(model ? { model } : {}),
   };
 }

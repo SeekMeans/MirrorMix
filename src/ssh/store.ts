@@ -12,6 +12,7 @@ import type {
   SshKeyView,
   SshKnownHost,
   SshSnippet,
+  SshTask,
 } from "../shared/ssh";
 
 export class SshError extends Error {
@@ -42,6 +43,7 @@ interface Saved {
   keys: StoredKey[];
   identities: StoredIdentity[];
   snippets: SshSnippet[];
+  tasks: SshTask[];
   forwards: SshForward[];
   knownHosts: SshKnownHost[];
 }
@@ -75,7 +77,7 @@ export interface SshTarget {
   jump?: SshTarget;
 }
 
-const empty = (): Saved => ({ version: 1, groups: [], hosts: [], keys: [], identities: [], snippets: [], forwards: [], knownHosts: [] });
+const empty = (): Saved => ({ version: 1, groups: [], hosts: [], keys: [], identities: [], snippets: [], tasks: [], forwards: [], knownHosts: [] });
 
 const clean = (value: unknown, max = 500): string => (typeof value === "string" ? value.trim().slice(0, max) : "");
 const tagsOf = (value: unknown): string[] =>
@@ -143,6 +145,8 @@ export function createSshStore(file: string, box: SecretBox, keys: KeyTools) {
         keys: data.keys.map(keyView),
         identities: data.identities.map(identityView),
         snippets: data.snippets,
+        // Tasks saved before tags existed have none.
+        tasks: data.tasks.map((task) => ({ ...task, tags: task.tags ?? [] })),
         forwards: data.forwards,
         knownHosts: data.knownHosts,
       };
@@ -248,6 +252,7 @@ export function createSshStore(file: string, box: SecretBox, keys: KeyTools) {
       data.hosts = data.hosts.filter((item) => item.id !== id);
       for (const host of data.hosts) if (host.jumpHostId === id) delete host.jumpHostId;
       data.forwards = data.forwards.filter((item) => item.hostId !== id);
+      data.tasks = data.tasks.filter((item) => item.hostId !== id);
       save();
     },
     touchHost(id: string) {
@@ -362,7 +367,7 @@ export function createSshStore(file: string, box: SecretBox, keys: KeyTools) {
     },
 
     // ---------- snippets ----------
-    saveSnippet(input: { id?: string; label: unknown; command: unknown; run?: unknown; tags?: unknown }): SshSnippet {
+    saveSnippet(input: { id?: string; label: unknown; command: unknown; run?: unknown; tags?: unknown; kind?: unknown }): SshSnippet {
       const command = typeof input.command === "string" ? input.command.replace(/\r\n/g, "\n").slice(0, 20_000) : "";
       if (!command.trim()) throw new SshError("command_required");
       const existing = input.id ? data.snippets.find((item) => item.id === input.id) : undefined;
@@ -373,13 +378,18 @@ export function createSshStore(file: string, box: SecretBox, keys: KeyTools) {
         command,
         run: input.run !== false,
         tags: tagsOf(input.tags),
+        ...(input.kind === "linux" || input.kind === "windows" || input.kind === "python" ? { kind: input.kind } : {}),
+        createdAt: existing?.createdAt ?? Date.now(),
+        updatedAt: Date.now(),
       };
+      if (existing && !snippet.kind) delete existing.kind;
       if (existing) Object.assign(existing, snippet);
       else data.snippets.push(snippet);
       save();
       return snippet;
     },
     deleteSnippet(id: string) {
+      if (data.tasks.some((task) => task.snippetId === id)) throw new SshError("snippet_in_use", 409);
       data.snippets = data.snippets.filter((item) => item.id !== id);
       for (const host of data.hosts) if (host.startupSnippetId === id) delete host.startupSnippetId;
       save();
@@ -388,6 +398,42 @@ export function createSshStore(file: string, box: SecretBox, keys: KeyTools) {
       const snippet = data.snippets.find((item) => item.id === id);
       if (!snippet) throw new SshError("unknown_snippet", 404);
       return snippet;
+    },
+
+    // ---------- tasks ----------
+    saveTask(input: { id?: unknown; name?: unknown; hostId?: unknown; dir?: unknown; snippetId?: unknown; tags?: unknown }): SshTask {
+      const host = findHost(String(input.hostId ?? ""));
+      const snippetId = String(input.snippetId ?? "");
+      const snippet = data.snippets.find((item) => item.id === snippetId);
+      if (!snippet) throw new SshError("snippet_required");
+      const dir = clean(input.dir, 1000);
+      if (/[\0\r\n]/.test(dir)) throw new SshError("bad_dir");
+      const existing = input.id ? data.tasks.find((item) => item.id === input.id) : undefined;
+      if (input.id && !existing) throw new SshError("unknown_task", 404);
+      const now = Date.now();
+      const task: SshTask = {
+        id: existing?.id ?? randomUUID(),
+        name: clean(input.name, 120) || `${snippet.label} @ ${host.label}`,
+        hostId: host.id,
+        dir,
+        snippetId,
+        tags: tagsOf(input.tags),
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+      };
+      if (existing) Object.assign(existing, task);
+      else data.tasks.push(task);
+      save();
+      return task;
+    },
+    deleteTask(id: string) {
+      data.tasks = data.tasks.filter((item) => item.id !== id);
+      save();
+    },
+    task(id: string): SshTask {
+      const task = data.tasks.find((item) => item.id === id);
+      if (!task) throw new SshError("unknown_task", 404);
+      return task;
     },
 
     // ---------- port forwarding ----------

@@ -27,6 +27,7 @@ import {
   MenuIcon,
   PlusIcon,
   PuzzleIcon,
+  FlowIcon,
   Spinner,
 } from "./icons";
 import { ToolIcon } from "./ToolIcon";
@@ -227,6 +228,9 @@ export interface SidebarProps {
   onSettings: () => void;
   /** 我的插件, from the left bar just above the menu. */
   onPlugins?: () => void;
+  /** Desktop: opens 工作流, the page beside the bar. */
+  onWorkflows?: () => void;
+  workflowsActive?: boolean;
   /** The plugin page is on screen: 插件 is the lit entry in the bar instead of 首页 or a tool. */
   pluginsActive?: boolean;
   /** Ends this login and returns to the sign-in page. Absent when the desk has no gate. */
@@ -439,9 +443,9 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
           <button
             type="button"
             className={
-              running && !props.pluginsActive ? "bar-item active" : "bar-item"
+              running && !(props.pluginsActive || props.workflowsActive) ? "bar-item active" : "bar-item"
             }
-            aria-current={running && !props.pluginsActive ? "page" : undefined}
+            aria-current={running && !(props.pluginsActive || props.workflowsActive) ? "page" : undefined}
             aria-label={`工作台，${busyCount} 个运行中或有新回复的会话`}
             title="工作台：各个 AI 工具里正在回复和回复完还没看的会话"
             onClick={props.onRunning}
@@ -461,19 +465,19 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
           <button
             type="button"
             className={
-              pinnedView && !props.pluginsActive
+              pinnedView && !(props.pluginsActive || props.workflowsActive)
                 ? "bar-item active"
                 : "bar-item"
             }
             aria-current={
-              pinnedView && !props.pluginsActive ? "page" : undefined
+              pinnedView && !(props.pluginsActive || props.workflowsActive) ? "page" : undefined
             }
             aria-label="钉住"
             title="钉住：在各个 AI 工具里钉住的会话"
             onClick={props.onPinned}
           >
             <span className="bar-icon">
-              <PushpinIcon filled={pinnedView && !props.pluginsActive} />
+              <PushpinIcon filled={pinnedView && !(props.pluginsActive || props.workflowsActive)} />
             </span>
             <span className="bar-label">钉住</span>
           </button>
@@ -488,7 +492,7 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
               !pinnedView &&
               item === tool &&
               !off &&
-              !props.pluginsActive;
+              !(props.pluginsActive || props.workflowsActive);
             const quota = off ? null : (props.catalog?.quotas?.[item] ?? null);
             const used = quota?.percent ?? null;
             return (
@@ -527,6 +531,20 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
               </button>
             );
           })}
+          {props.onWorkflows && (
+            <button
+              type="button"
+              className={props.workflowsActive ? "bar-item bar-flows active" : "bar-item bar-flows"}
+              aria-current={props.workflowsActive ? "page" : undefined}
+              title="工作流"
+              onClick={props.onWorkflows}
+            >
+              <span className="bar-icon">
+                <FlowIcon size={22} />
+              </span>
+              <span className="bar-label">工作流</span>
+            </button>
+          )}
           {props.onPlugins && (
             <button
               type="button"

@@ -22,6 +22,9 @@ import { TaskError, type CommandTasks } from "../tasks/commandTasks";
 import { workspaceTerminalKey, type TerminalProject } from "../shared/terminalScope";
 import { createPreviewPickStore, PreviewPickError, type PreviewPickStore } from "../settings/previewPicks";
 import { saveUpload, UploadError } from "./uploads";
+import { WorkflowError, type WorkflowEngine } from "../workflow/engine";
+import { ModelError, type ModelStore } from "../models/modelStore";
+import { readScript, SCRIPT_KINDS, scriptPrompt, type ScriptKind } from "../models/scriptWriter";
 
 function asTool(value: unknown): ToolId | null {
   return value === "claude" || value === "codex" || value === "cursor" || value === "deepseek" ? value : null;
@@ -177,6 +180,10 @@ export function createApp(
   uploadsDir: string = process.env.AIMISS_UPLOADS || path.join(os.homedir(), ".mirrormix", "uploads"),
   /** The SSH plugin: saved hosts, keychain, terminals, SFTP and port forwarding. */
   ssh?: { manager: SshManager; store: SshStore },
+  /** 工作流: saved chains of AI and plugin steps, and their runs. */
+  workflows?: WorkflowEngine,
+  /** 模型管理: models reached by API, used by 工作流. */
+  models?: ModelStore,
 ): http.Server {
   const picks =
     previewPicks ??
@@ -326,6 +333,85 @@ export function createApp(
           return sendJson(response, 405, { error: "bad_request" });
         } catch (error) {
           if (error instanceof TaskError) return sendJson(response, error.status, { error: error.code });
+          throw error;
+        }
+      }
+      if (models && (url.pathname === "/api/models" || url.pathname.startsWith("/api/models/"))) {
+        response.setHeader("Cache-Control", "no-store");
+        try {
+          const match = url.pathname.match(/^\/api\/models(?:\/([\w-]{1,64})(\/test|\/script)?)?$/);
+          if (!match) return sendJson(response, 404, { error: "not_found" });
+          const [, id, test] = match;
+          if (!id && request.method === "GET") return sendJson(response, 200, { models: models.list() });
+          if (!id && request.method === "POST") return sendJson(response, 200, models.save(await readJson<unknown>(request, 16_384)));
+          if (id && !test && request.method === "PUT") return sendJson(response, 200, models.save(await readJson<unknown>(request, 16_384), id));
+          if (id && !test && request.method === "DELETE") {
+            models.remove(id);
+            return sendJson(response, 200, { ok: true });
+          }
+          if (id && test === "/script" && request.method === "POST") {
+            // 代码片段 → AI 写: a snippet for a Linux shell, PowerShell or Python, from what the person described.
+            const input = await readJson<{ kind?: unknown; description?: unknown; current?: unknown }>(request, 64_000);
+            const kind = SCRIPT_KINDS.includes(input.kind as ScriptKind) ? (input.kind as ScriptKind) : "linux";
+            const description = typeof input.description === "string" ? input.description.slice(0, 8_000) : "";
+            if (!description.trim()) return sendJson(response, 400, { error: "description_required" });
+            const current = typeof input.current === "string" ? input.current.slice(0, 20_000) : "";
+            try {
+              const reply = await models.chat(id, scriptPrompt(kind, description, current), { timeoutMs: 120_000, json: true });
+              const script = readScript(reply);
+              if (!script.command) return sendJson(response, 200, { ok: false, message: "模型没有给出命令，换个说法再试一次。" });
+              return sendJson(response, 200, { ok: true, ...script });
+            } catch (error) {
+              if (error instanceof ModelError) throw error;
+              return sendJson(response, 200, { ok: false, message: (error as Error).message });
+            }
+          }
+          if (id && test && request.method === "POST") {
+            // A short question, so the page can tell whether the address, model name and key work.
+            const started = Date.now();
+            try {
+              const reply = await models.chat(id, [{ role: "user", content: "用一句话回答：你是哪个模型？" }], { timeoutMs: 60_000 });
+              return sendJson(response, 200, { ok: true, reply: reply.slice(0, 300), ms: Date.now() - started });
+            } catch (error) {
+              if (error instanceof ModelError) throw error;
+              return sendJson(response, 200, { ok: false, message: (error as Error).message });
+            }
+          }
+          return sendJson(response, 405, { error: "bad_request" });
+        } catch (error) {
+          if (error instanceof ModelError) return sendJson(response, error.status, { error: error.code });
+          throw error;
+        }
+      }
+      if (workflows && (url.pathname === "/api/workflows" || url.pathname.startsWith("/api/workflows/"))) {
+        response.setHeader("Cache-Control", "no-store");
+        try {
+          const runMatch = url.pathname.match(/^\/api\/workflows\/runs\/([\w-]{1,64})(\/stop)?$/);
+          if (runMatch) {
+            const [, runId, stop] = runMatch;
+            if (stop && request.method === "POST") return sendJson(response, 200, workflows.stop(runId));
+            if (!stop && request.method === "GET") return sendJson(response, 200, workflows.getRun(runId));
+            return sendJson(response, 405, { error: "bad_request" });
+          }
+          const match = url.pathname.match(/^\/api\/workflows(?:\/([\w-]{1,64})(?:\/(run|runs))?)?$/);
+          if (!match) return sendJson(response, 404, { error: "not_found" });
+          const [, id, action] = match;
+          if (!id && request.method === "GET") return sendJson(response, 200, { workflows: workflows.list() });
+          if (!id && request.method === "POST") return sendJson(response, 200, workflows.save(await readJson<unknown>(request, 512_000)));
+          if (id && !action && request.method === "GET") return sendJson(response, 200, workflows.get(id));
+          if (id && !action && request.method === "PUT") return sendJson(response, 200, workflows.save(await readJson<unknown>(request, 512_000), id));
+          if (id && !action && request.method === "DELETE") {
+            workflows.remove(id);
+            return sendJson(response, 200, { ok: true });
+          }
+          if (id && action === "run" && request.method === "POST") {
+            const body = await readJson<{ input?: unknown }>(request, 64_000);
+            return sendJson(response, 200, workflows.run(id, typeof body.input === "string" ? body.input : ""));
+          }
+          if (id && action === "runs" && request.method === "GET") return sendJson(response, 200, { runs: workflows.runs(id) });
+          return sendJson(response, 405, { error: "bad_request" });
+        } catch (error) {
+          if (error instanceof WorkflowError) return sendJson(response, error.status, { error: error.code });
           throw error;
         }
       }
