@@ -4803,7 +4803,15 @@ button.pref-row:active { background: var(--rail); }
 .ssh-task-where code { padding: 1px 6px; border-radius: 4px; background: var(--code); font: 11.5px var(--mono); overflow-wrap: anywhere; }
 .ssh-task-last { flex: none; display: grid; justify-items: end; gap: 2px; padding: 4px 8px; border: 0; border-radius: 7px; background: transparent; font: inherit; cursor: pointer; }
 .ssh-task-last:hover { background: var(--bubble); }
-.ssh-task-toggle { font-size: 11.5px; color: var(--faint); }
+.ssh-task-toggle { display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; color: var(--faint); }
+.ssh-task-toggle svg { width: 11px; height: 11px; transition: transform 160ms ease; }
+.ssh-task-last[aria-expanded="true"] .ssh-task-toggle svg { transform: rotate(90deg); }
+.ssh-task-last:hover .ssh-task-toggle { color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .ssh-task-toggle svg { transition: none; } }
+/* The output slides open under the card instead of popping in. */
+.ssh-task > .ssh-run { animation: ssh-run-open 180ms ease-out; }
+@keyframes ssh-run-open { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .ssh-task > .ssh-run { animation: none; } }
 
 .ssh-run-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
 .ssh-run-badge em { font-style: normal; font-weight: 400; color: var(--faint); font-variant-numeric: tabular-nums; }
@@ -5061,11 +5069,89 @@ button.pref-row:active { background: var(--rail); }
 .ssh-task-icon.is-delete:hover { color: var(--ssh-bad); }
 
 /* On a phone the name and details take the width; the result and actions sit on their own line below. */
-.ssh.is-mobile .ssh-task-row { flex-wrap: wrap; row-gap: 8px; }
-.ssh.is-mobile .ssh-task-main { flex-basis: 100%; }
+/* Phone: name and details on the left, run / edit / delete beside them on the right; the last run and
+   "> 展开输出" take the full width below, as one bar that opens the output. */
+.ssh.is-mobile .ssh-task-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: start;
+  column-gap: 2px;
+  row-gap: 8px;
+  padding: 12px 8px 10px 14px;
+}
+.ssh.is-mobile .ssh-task-main { grid-column: 1; grid-row: 1; padding-top: 2px; margin-right: 6px; }
 .ssh.is-mobile .ssh-task-line { flex-wrap: wrap; }
 .ssh.is-mobile .ssh-task-where { flex-wrap: wrap; }
-.ssh.is-mobile .ssh-task-side { width: 100%; justify-content: flex-end; }
-.ssh.is-mobile .ssh-task-side .ssh-task-last { margin-right: auto; justify-items: start; padding-left: 0; }
-.ssh.is-mobile .ssh-task-side .ssh-task-run { width: 42px; height: 42px; }
-.ssh.is-mobile .ssh-task-icon { width: 40px; height: 40px; }
+.ssh.is-mobile .ssh-task-side { display: contents; }
+.ssh.is-mobile .ssh-task-side .ssh-task-run { grid-row: 1; width: 38px; height: 38px; margin-right: 2px; }
+.ssh.is-mobile .ssh-task-icon { grid-row: 1; width: 38px; height: 38px; }
+.ssh.is-mobile .ssh-task-side .ssh-task-last {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 6px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--page);
+}
+.ssh.is-mobile .ssh-task-side .ssh-task-last .ssh-task-toggle { order: -1; font-size: 13px; color: var(--muted); }
+.ssh.is-mobile .ssh-task-toggle svg { width: 12px; height: 12px; }
+
+/* ---------- Asking before a snippet is deleted ---------- */
+/* Above the snippet's own view, which may be open underneath. */
+.ssh-confirm-layer { z-index: 12; animation: ssh-confirm-fade 140ms ease-out; }
+.ssh-confirm { width: min(440px, 100%); gap: 14px; padding: 22px 22px 18px; animation: ssh-confirm-rise 160ms cubic-bezier(0.2, 0.8, 0.3, 1); }
+.ssh-confirm-head { display: flex; align-items: flex-start; gap: 14px; }
+.ssh-confirm-head > div { display: grid; gap: 4px; min-width: 0; }
+.ssh-confirm-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  color: #c4472f;
+  background: color-mix(in srgb, #c4472f 12%, var(--surface));
+}
+.ssh-confirm-mark svg { width: 18px; height: 18px; }
+.ssh-confirm-item { display: grid; gap: 8px; min-width: 0; padding: 12px 14px; border: 1px solid var(--line-soft); border-radius: 10px; background: var(--page); }
+.ssh-confirm-item-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ssh-confirm-item-top strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.ssh-confirm-item pre {
+  margin: 0;
+  max-height: 7.5em;
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ssh-confirm-more { color: var(--faint); font-family: var(--sans); }
+.ssh-confirm-users { display: grid; gap: 4px; margin: 0; padding: 10px 14px 10px 30px; border-radius: 9px; background: var(--amber-soft); color: var(--amber); font-size: 13px; }
+.ssh-confirm-error { color: #c4472f !important; }
+.ssh-confirm .ssh-modal-actions { margin-top: 2px; }
+.ssh-confirm .ssh-modal-actions .quiet-button { min-width: 76px; justify-content: center; }
+.ssh-confirm .ssh-modal-actions .quiet-button svg { width: 13px; height: 13px; }
+@keyframes ssh-confirm-fade { from { opacity: 0; } }
+@keyframes ssh-confirm-rise { from { opacity: 0; transform: translateY(6px) scale(0.98); } }
+@media (prefers-reduced-motion: reduce) { .ssh-confirm-layer, .ssh-confirm { animation: none; } }
+
+/* Phone: a short sheet from the bottom over a dimmed page, not a whole new screen. */
+.ssh.is-mobile .ssh-modal.ssh-confirm-layer { z-index: 72; place-items: end stretch; padding: 0; background: rgba(15, 20, 28, 0.42); }
+.ssh.is-mobile .ssh-confirm {
+  height: auto;
+  border-radius: 16px 16px 0 0;
+  padding: 20px 16px calc(16px + env(safe-area-inset-bottom));
+  box-shadow: var(--shadow);
+}
+.ssh.is-mobile .ssh-confirm .ssh-modal-actions .quiet-button { flex: 1; height: 42px; }
+
+/* Phone: a plugin's main button at the right end of its top bar (SSH 连接 … 新建任务). */
+.is-mobile .settings-page .settings-subhead > .plugin-head-actions { flex: none; display: flex; align-items: center; gap: 6px; }
+.is-mobile .settings-page .settings-subhead > .plugin-head-actions:empty { display: none; }
+.plugin-head-actions .ssh-new-task { height: 34px; padding: 0 12px; border-radius: 17px; font-size: 14px; white-space: nowrap; }
+.plugin-head-actions .ssh-new-task svg { width: 14px; height: 14px; }

@@ -17,6 +17,7 @@ import type {
   SshTaskRun,
 } from "../../src/shared/ssh";
 import { api, apiFetch, apiRequest, type ModelView } from "./api";
+import { createPortal } from "react-dom";
 import { Select, type SelectOption } from "./Select";
 import { ChevronIcon, CloseIcon, EditIcon, FileIcon, FolderIcon, PlayIcon, PlusIcon, RefreshIcon, SearchIcon, ShieldQuestionIcon, Spinner, StopIcon, TrashIcon, UpIcon } from "./icons";
 
@@ -1609,6 +1610,92 @@ function SnippetView({ snippet, onClose, onEdit, onDelete }: { snippet: SshSnipp
   );
 }
 
+/**
+ * Asks before a snippet goes: shows which one (name, type, the start of its command), says it cannot be undone, and
+ * keeps the delete button shut while tasks still run it, naming them, instead of failing after the click.
+ */
+function SnippetDeleteDialog({ snippet, users, onCancel, onDeleted }: { snippet: SshSnippet; users: SshTask[]; onCancel: () => void; onDeleted: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState("");
+  const cancel = useRef<HTMLButtonElement>(null);
+  const onCancelRef = useRef(onCancel);
+  onCancelRef.current = onCancel;
+  useEffect(() => {
+    // Keep and Cancel is the safe answer, so it holds the focus: Enter alone does not delete.
+    cancel.current?.focus();
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      // The snippet's own view may be open underneath; Esc closes only this question.
+      event.stopImmediatePropagation();
+      onCancelRef.current();
+    };
+    window.addEventListener("keydown", escape, true);
+    return () => window.removeEventListener("keydown", escape, true);
+  }, []);
+  const lines = snippet.command.split(/\r?\n/);
+  const preview = lines.slice(0, 4).join("\n");
+  const blocked = users.length > 0;
+  const confirm = async () => {
+    setBusy(true);
+    setFailed("");
+    try {
+      await ssh.deleteSnippet(snippet.id);
+      onDeleted();
+    } catch (error) {
+      setFailed(explain(error));
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="ssh-modal ssh-confirm-layer" role="alertdialog" aria-modal="true" aria-labelledby="ssh-snippet-delete-title" aria-describedby="ssh-snippet-delete-note" onPointerDown={(event) => event.target === event.currentTarget && !busy && onCancel()}>
+      <div className="ssh-modal-card ssh-confirm">
+        <div className="ssh-confirm-head">
+          <span className="ssh-confirm-mark" aria-hidden="true">
+            <TrashIcon />
+          </span>
+          <div>
+            <h3 id="ssh-snippet-delete-title">删除这个代码片段？</h3>
+            <p id="ssh-snippet-delete-note">{blocked ? "还有任务在用它，先把这些任务换成别的片段或删掉。" : "删除后无法恢复。"}</p>
+          </div>
+        </div>
+        <div className="ssh-confirm-item">
+          <span className="ssh-confirm-item-top">
+            {snippetMark(snippet)}
+            <strong>{snippet.label}</strong>
+          </span>
+          <pre>
+            {preview}
+            {lines.length > 4 && <span className="ssh-confirm-more">{`\n… 还有 ${lines.length - 4} 行`}</span>}
+          </pre>
+        </div>
+        {blocked && (
+          <ul className="ssh-confirm-users" aria-label="在用这个片段的任务">
+            {users.map((task) => (
+              <li key={task.id}>{task.name}</li>
+            ))}
+          </ul>
+        )}
+        {failed && (
+          <p className="ssh-confirm-error" role="alert">
+            {failed}
+          </p>
+        )}
+        <div className="ssh-modal-actions">
+          <button type="button" className="quiet-button" ref={cancel} onClick={onCancel} disabled={busy}>
+            {blocked ? "知道了" : "取消"}
+          </button>
+          {!blocked && (
+            <button type="button" className="quiet-button is-danger" onClick={() => void confirm()} disabled={busy}>
+              {busy ? <Spinner /> : <TrashIcon />}
+              {busy ? "正在删除" : "删除"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SnippetsSection({ state, onChange, onError }: { state: SshState; onChange: () => void; onError: (text: string) => void }) {
   const [form, setForm] = useState<Partial<SshSnippet> | null>(null);
   const [viewing, setViewing] = useState<string | null>(null);
@@ -1628,16 +1715,10 @@ function SnippetsSection({ state, onChange, onError }: { state: SshState; onChan
     .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
   const open = viewing ? state.snippets.find((snippet) => snippet.id === viewing) : undefined;
 
-  const remove = async (snippet: SshSnippet) => {
-    if (!window.confirm(`删除片段“${snippet.label}”？`)) return;
-    try {
-      await ssh.deleteSnippet(snippet.id);
-      setViewing(null);
-      onChange();
-    } catch (error) {
-      onError(explain(error));
-    }
-  };
+  /** The snippet waiting on the delete question, if any. */
+  const [deleting, setDeleting] = useState<SshSnippet | null>(null);
+  const remove = (snippet: SshSnippet) => setDeleting(snippet);
+  const cancelDelete = useCallback(() => setDeleting(null), []);
 
   return (
     <div className="ssh-section">
@@ -1694,7 +1775,19 @@ function SnippetsSection({ state, onChange, onError }: { state: SshState; onChan
             setViewing(null);
             setForm(open);
           }}
-          onDelete={() => void remove(open)}
+          onDelete={() => remove(open)}
+        />
+      )}
+      {deleting && (
+        <SnippetDeleteDialog
+          snippet={deleting}
+          users={state.tasks.filter((task) => task.snippetId === deleting.id)}
+          onCancel={cancelDelete}
+          onDeleted={() => {
+            setDeleting(null);
+            setViewing(null);
+            onChange();
+          }}
         />
       )}
 
@@ -1725,7 +1818,7 @@ function SnippetsSection({ state, onChange, onError }: { state: SshState; onChan
                 <button type="button" className="icon-button" aria-label={`编辑 ${snippet.label}`} title="编辑" onClick={() => setForm(snippet)}>
                   <EditIcon />
                 </button>
-                <button type="button" className="icon-button is-delete" aria-label={`删除 ${snippet.label}`} title="删除" onClick={() => void remove(snippet)}>
+                <button type="button" className="icon-button is-delete" aria-label={`删除 ${snippet.label}`} title="删除" onClick={() => remove(snippet)}>
                   <TrashIcon />
                 </button>
               </span>
@@ -2001,12 +2094,15 @@ function TasksSection({
   onError,
   onHostKey,
   onSnippets,
+  headerSlot = null,
 }: {
   state: SshState;
   onChange: () => void;
   onError: (text: string) => void;
   onHostKey: (question: SshHostKeyQuestion, retry: () => void) => void;
   onSnippets: () => void;
+  /** Phone: 新建任务 goes into the page's top bar, opposite "SSH 连接", instead of a row of its own. */
+  headerSlot?: HTMLElement | null;
 }) {
   const [form, setForm] = useState<Partial<SshTask> | null>(null);
   /** The tag picked above the list; picking it again shows every task. */
@@ -2047,23 +2143,34 @@ function TasksSection({
   const picked = tag && allTags.includes(tag) ? tag : null;
   const shown = state.tasks.filter((task) => !picked || tagsOf(task).includes(picked));
   const missing = !state.hosts.length ? "先在“主机”里添加一台主机。" : !state.snippets.length ? "先在“代码片段”里写好要执行的命令。" : "";
+  const newTask = (
+    <button type="button" className="quiet-button is-primary ssh-new-task" disabled={Boolean(missing)} onClick={() => setForm({})}>
+      <PlusIcon />
+      新建任务
+    </button>
+  );
 
   return (
     <div className="ssh-section">
-      <div className="ssh-toolbar ssh-task-toolbar">
-        <p className="ssh-field-hint">
-          {missing || "任务 = 主机 + 目录 + 代码片段。点 ▶ 就在那台主机的目录里执行，不用打开终端。"}
-          {missing && !!state.hosts.length && (
-            <button type="button" className="link-button" onClick={onSnippets}>
-              去写代码片段
-            </button>
+      {/* Only what is missing before a task can be made gets a line; the button sits at the right end. */}
+      {(missing || !headerSlot) && (
+        <div className="ssh-toolbar ssh-task-toolbar">
+          {missing ? (
+            <p className="ssh-field-hint">
+              {missing}
+              {!!state.hosts.length && (
+                <button type="button" className="link-button" onClick={onSnippets}>
+                  去写代码片段
+                </button>
+              )}
+            </p>
+          ) : (
+            <span className="ssh-spacer" />
           )}
-        </p>
-        <button type="button" className="quiet-button is-primary" disabled={Boolean(missing)} onClick={() => setForm({})}>
-          <PlusIcon />
-          新建任务
-        </button>
-      </div>
+          {!headerSlot && newTask}
+        </div>
+      )}
+      {headerSlot && createPortal(newTask, headerSlot)}
 
       {allTags.length > 0 && (
         <div className="ssh-tag-filter" role="group" aria-label="按标签筛选">
@@ -2138,11 +2245,15 @@ function TasksSection({
                         type="button"
                         className="ssh-task-last"
                         aria-expanded={isOpen}
-                        title={isOpen ? "收起输出" : "看输出"}
+                        title={isOpen ? "收起输出" : "展开输出"}
                         onClick={() => setOpen(isOpen ? null : { taskId: task.id, runId: last.id })}
                       >
                         <RunBadge run={last} now={now} />
-                        <span className="ssh-task-toggle">{isOpen ? "收起输出" : "看输出"}</span>
+                        <span className="ssh-task-toggle">
+                          {/* ">" turns to point down while the output is open below. */}
+                          <ChevronIcon />
+                          {isOpen ? "收起输出" : "展开输出"}
+                        </span>
                       </button>
                     )}
                     <button
@@ -2192,7 +2303,7 @@ function TasksSection({
 
 type Tab = { kind: "vault" } | { kind: "terminal"; tid: string } | { kind: "sftp"; hostId: string };
 
-export function SshPlugin({ mobile = false }: { mobile?: boolean }) {
+export function SshPlugin({ mobile = false, headerSlot = null }: { mobile?: boolean; headerSlot?: HTMLElement | null }) {
   const [state, setState] = useState<SshState | null>(null);
   const [section, setSection] = useState<Section>("hosts");
   const [tab, setTab] = useState<Tab>({ kind: "vault" });
@@ -2380,7 +2491,14 @@ export function SshPlugin({ mobile = false }: { mobile?: boolean }) {
             {section === "keychain" && <KeychainSection state={state} onChange={() => void refresh()} onError={showError} />}
             {section === "snippets" && <SnippetsSection state={state} onChange={() => void refresh()} onError={showError} />}
             {section === "tasks" && (
-              <TasksSection state={state} onChange={() => void refresh()} onError={showError} onHostKey={askHostKey} onSnippets={() => setSection("snippets")} />
+              <TasksSection
+                state={state}
+                onChange={() => void refresh()}
+                onError={showError}
+                onHostKey={askHostKey}
+                onSnippets={() => setSection("snippets")}
+                headerSlot={mobile ? headerSlot : null}
+              />
             )}
           </div>
           {editing && (

@@ -15,6 +15,8 @@ export interface PluginContext {
   placeOf: (job: ScheduleJob) => string;
   /** Laid out for a phone. */
   mobile?: boolean;
+  /** Phone: the right end of the bar with the plugin's name, where it may put its main button. */
+  headerSlot?: HTMLElement | null;
 }
 
 interface PluginInfo {
@@ -92,7 +94,7 @@ export const PLUGINS: PluginInfo[] = [
     name: "SSH 连接",
     lead: "连接服务器：多标签终端、SFTP 文件、密钥和代码片段。密码和私钥加密保存在这台电脑上。",
     Icon: ServerIcon,
-    render: (context) => <SshPlugin mobile={context.mobile} />,
+    render: (context) => <SshPlugin mobile={context.mobile} headerSlot={context.headerSlot} />,
     wide: true,
   },
 ];
@@ -163,6 +165,8 @@ export function PluginsDialog({
   onClose: () => void;
 }) {
   const page = variant === "page";
+  /** The phone bar's right end, handed to the plugin open below it. */
+  const [headerSlot, setHeaderSlot] = useState<HTMLDivElement | null>(null);
   const list = (installed ?? []).map(byId).filter((plugin): plugin is PluginInfo => Boolean(plugin));
   // The page reopens on the plugin used last (per browser); the dialog and the phone start from their list.
   const [chosen, setChosen] = useState<PluginId | null>(() => {
@@ -320,8 +324,9 @@ export function PluginsDialog({
             <div>
               <h2 id="plugin-title">{current.name}</h2>
             </div>
+            <div className="plugin-head-actions" ref={setHeaderSlot} />
           </header>
-          <div className={current.wide ? "settings-body is-flush" : "settings-body"}>{current.render(context)}</div>
+          <div className={current.wide ? "settings-body is-flush" : "settings-body"}>{current.render({ ...context, headerSlot })}</div>
         </section>
       );
     }
