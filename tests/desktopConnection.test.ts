@@ -66,7 +66,7 @@ describe("desktop-only messaging", () => {
       expect(supervisor.open("codex", "codex-thread")).toMatchObject({ attached: "desktop", sendEnabled: true });
       expect(readDesktopStream).not.toHaveBeenCalled();
       await supervisor.send("codex", "codex-thread", "desktop Codex ping");
-      expect(submitCodex).toHaveBeenCalledWith("Codex title", "desktop Codex ping");
+      expect(submitCodex).toHaveBeenCalledWith("Codex title", "desktop Codex ping", "codex-thread");
       expect(supervisor.getSession("codex", "codex-thread").messages).toEqual(
         expect.arrayContaining([expect.objectContaining({ id: "pending-user", role: "user", text: "desktop Codex ping" })]),
       );
@@ -158,7 +158,7 @@ describe("original transports", () => {
     try {
       expect(supervisor.open("codex", "codex-thread")).toMatchObject({ attached: "desktop", sendEnabled: true });
       await supervisor.send("codex", "codex-thread", "to the window");
-      expect(submitCodex).toHaveBeenCalledWith("Codex title", "to the window");
+      expect(submitCodex).toHaveBeenCalledWith("Codex title", "to the window", "codex-thread");
       expect(spawn).not.toHaveBeenCalled();
     } finally { supervisor.dispose(); }
   });

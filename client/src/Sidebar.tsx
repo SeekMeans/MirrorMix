@@ -310,7 +310,7 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
         [];
       const seen = new Set<string>();
       for (const group of catalog[item]) {
-        const place = group.label ?? splitPath(group.path).name;
+        const place = group.label ?? group.projectName ?? splitPath(group.path).name;
         for (const session of group.sessions) {
           const done =
             !session.working && finished.has(`${item}:${session.id}`);
@@ -339,7 +339,7 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
         for (const session of group.sessions) {
           const key = `${item}:${session.id}`;
           if (!byKey.has(key))
-            byKey.set(key, { session, path: group.path, label: group.label });
+            byKey.set(key, { session, path: group.path, label: group.label ?? group.projectName });
         }
       }
     }
@@ -382,7 +382,7 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
   const pinnedRows = useMemo(() => {
     const found = new Map<string, { session: SessionSummary; place: string }>();
     for (const group of groups) {
-      const place = group.label ?? splitPath(group.path).name;
+      const place = group.label ?? group.projectName ?? splitPath(group.path).name;
       for (const session of group.sessions) {
         if (session.pinned && !found.has(session.id))
           found.set(session.id, { session, place });
@@ -968,7 +968,7 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
 
           {shown.map((group) => {
             const split = splitPath(group.path);
-            const name = group.label ?? split.name;
+            const name = group.label ?? group.projectName ?? split.name;
             const parent = group.label ? "" : split.parent;
             const closed = collapsed.has(group.path);
             const holdsSelected = group.sessions.some(
@@ -982,7 +982,7 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
             const hidden = group.sessions.length - visible.length;
             const creating = creatingPath === group.path;
             return (
-              <section className="workspace" key={group.path}>
+              <section className="workspace" key={group.label ? `${group.path}:${group.label}` : group.path}>
                 <div className="workspace-head">
                   <button
                     type="button"

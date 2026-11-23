@@ -6,12 +6,18 @@ import { describe, expect, it, vi } from "vitest";
 import { WebSocket } from "ws";
 import { createSupervisor } from "../src/process/supervisor";
 import { createApp, listenLocal, type CommandShell } from "../src/server/app";
-import { createTerminalHub, replayTerminalOutput } from "../src/server/terminals";
+import { createTerminalHub, replayTerminalOutput, trimBacklog } from "../src/server/terminals";
 import { workspaceTerminalKey } from "../src/shared/terminalScope";
 
 describe("project terminal identity", () => {
   it("replays display state without asking a new screen to repeat old device handshakes", () => {
     expect(replayTerminalOutput('hello\x1b[c\x1b[0c\x1b[>0c\x1b[32mgreen\x1b[0m')).toBe('hello\x1b[32mgreen\x1b[0m');
+  });
+  it("cuts a long backlog at a line start, not inside a colour code", () => {
+    const kept = trimBacklog("\x1b[32m" + "z".repeat(1000) + "\nkeep" + "y".repeat(199_990));
+    expect(kept.startsWith("keep")).toBe(true);
+    expect(kept.length).toBeLessThanOrEqual(200_000);
+    expect(trimBacklog("short")).toBe("short");
   });
   it("normalizes Windows drive, separators, case and extended paths without merging worktrees", () => {
     expect(workspaceTerminalKey('C:\\Work\\App\\')).toBe(workspaceTerminalKey('c:/work/app'));
@@ -49,6 +55,42 @@ describe("project terminal identity", () => {
 });
 
 describe("project terminal API", () => {
+  it("loads saved services and opens a named tab without accepting malformed selections", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "project-service-api-"));
+    const writes: string[] = [];
+    const supervisor = { getSession: () => ({ workspacePath: root }) } as unknown as ReturnType<typeof createSupervisor>;
+    vi.stubEnv("AIMISS_SERVICES", path.join(root, "services.json"));
+    const server = createApp(supervisor, undefined, undefined, {
+      open: () => ({ pid: 100, write: text => { writes.push(text); }, resize() {}, kill() {}, onData() {}, onExit() {} }),
+    }, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, {
+      children: async () => [], killTree: async () => true,
+    });
+    try {
+      await listenLocal(server, 0);
+      const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+      const session = { tool: "codex", id: "chat" };
+      const request = (route: string, method: string, body: unknown) => fetch(base + route, {
+        method, headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+      });
+      writeFileSync(path.join(root, "package.json"), JSON.stringify({ scripts: { start: "node ." } }));
+      const detected = await fetch(`${base}/api/services/detect?tool=codex&id=chat`);
+      expect((await detected.json()).services).toMatchObject([{ dir: "", command: "npm start" }]);
+      const saved = await request("/api/services", "PUT", { ...session, services: [{ name: "后端", dir: "", command: "npm start" }] });
+      expect(saved.status).toBe(200);
+      const invalid = await request("/api/services/run", "POST", { ...session, action: "start", names: [true] });
+      expect(invalid.status).toBe(400);
+      expect(writes).toEqual([]);
+      const started = await request("/api/services/run", "POST", { ...session, action: "start", names: ["后端"] });
+      expect(started.status).toBe(200);
+      const result = await started.json();
+      expect(result.terminals).toMatchObject([{ label: "后端", tid: result.focus }]);
+      expect(writes).toEqual([`cd /d "${root}" && npm start\r`]);
+    } finally {
+      vi.unstubAllEnvs();
+      await new Promise<void>(resolve => server.close(() => resolve()));
+    }
+  });
+
   it("shares three terminals across conversations and tools, isolates other projects, and stops them on service shutdown", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "project-terminals-"));
     const workspace = path.join(root, "app"), other = path.join(root, "other"), projects = path.join(root, "claude"), codex = path.join(root, "codex");

@@ -108,6 +108,57 @@ describe("Codex list", () => {
     expect(groups.at(-1)?.label).toBe("任务");
   });
 
+  it("lists projects from custom sidebar sections in the same flat project list", () => {
+    const home = mkdtempSync(path.join(tmpdir(), "aimiss-codex-sections-"));
+    const sessions = path.join(home, "sessions");
+    const work = path.join(home, "work");
+    const study = path.join(home, "study");
+    const ordinary = path.join(home, "ordinary");
+    const sectionOnly = path.join(home, "section-only");
+    for (const dir of [sessions, work, study, ordinary, sectionOnly]) mkdirSync(dir);
+    writeFileSync(path.join(sessions, "thread.jsonl"), [
+      JSON.stringify({ type: "session_meta", payload: { id: "thread", cwd: path.join(work, "nested") } }),
+      JSON.stringify({ type: "event_msg", payload: { type: "user_message", message: "Under work" } }),
+    ].join(NL));
+    writeFileSync(path.join(home, ".codex-global-state.json"), JSON.stringify({
+      "electron-renderer-content-owner": "current",
+      "electron-owner-atoms:current": { "sidebar-custom-sections-v3": { workspace: {
+        sections: [
+          { id: "work", name: "工作", itemKeys: ["codex:project:work-root", "codex:project:section-only", "codex:thread:thread"] },
+          { id: "study", name: "学习", itemKeys: ["codex:project:study-db", "codex:project:missing"] },
+        ],
+      } } },
+      "electron-owner-atoms:other": { "sidebar-custom-sections-v3": { other: {
+        sections: [{ id: "other", name: "其他帐号", itemKeys: ["codex:project:ordinary"] }],
+      } } },
+      "project-order": ["ordinary"],
+      "local-projects": {
+        "work-root": { name: "旧项目名", rootPaths: [work] },
+        "section-only": { name: "仅在自定义分区", rootPaths: [sectionOnly] },
+        ordinary: { name: "常规", rootPaths: [ordinary] },
+      },
+      "app-server-project-id-by-legacy-project-id-by-host": { host: { "work-root": "work-db" } },
+      "thread-project-assignments": { thread: { projectKind: "local", projectId: "work-db" } },
+    }));
+    const require = createRequire(import.meta.url);
+    const { DatabaseSync } = require(["node", "sqlite"].join(":"));
+    const db = new DatabaseSync(path.join(home, "state_5.sqlite"));
+    try {
+      db.exec("CREATE TABLE projects (id TEXT PRIMARY KEY, name TEXT, position INTEGER); CREATE TABLE project_roots (project_id TEXT, path TEXT, position INTEGER)");
+      db.prepare("INSERT INTO projects VALUES (?, ?, ?), (?, ?, ?)").run("work-db", "新项目名", 0, "study-db", "学习项目", 1);
+      db.prepare("INSERT INTO project_roots VALUES (?, ?, ?), (?, ?, ?)").run("work-db", work, 0, "study-db", study, 0);
+    } finally {
+      db.close();
+    }
+    const groups = readCatalog({ claudeProjectsDir: "", claudeDataDir: "", codexSessionsDir: sessions }).codex;
+    expect(groups.map(({ path, projectName, sessions }) => [path, projectName, sessions.map((session) => session.id)])).toEqual([
+      [ordinary, "常规", []],
+      [work, "新项目名", ["thread"]],
+      [sectionOnly, "仅在自定义分区", []],
+      [study, "学习项目", []],
+    ]);
+  });
+
   it("follows the desktop app: its names, its projects in its order, and nothing the app does not list", () => {
     const home = mkdtempSync(path.join(tmpdir(), "aimiss-codex-"));
     const sessions = path.join(home, "sessions", "2026", "11", "11");

@@ -101,6 +101,7 @@ export interface SessionSummary {
 
 export interface WorkspaceGroup {
   path: string;
+  projectName?: string;
   /** The tool pins this project, or at least one of its conversations. */
   pinned?: boolean;
   /** Shown instead of the folder name, for groups that are not a folder in the tool's own list. */

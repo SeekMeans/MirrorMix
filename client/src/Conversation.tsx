@@ -46,7 +46,7 @@ const MessageRow = memo(function MessageRow({ message }: { message: TranscriptMe
     <article className={pending ? "message user pending" : "message user"}>
       <span className="cc-prompt" aria-hidden="true">{marks.prompt}</span>
       <div className="user-copy">
-        {queued && <span className="queue-mark">排队</span>}
+        {pending && <span className="queue-mark">{queued ? "排队" : "等待送达"}</span>}
         {long && !expanded ? `${message.text.slice(0, LONG_USER_TEXT)}…` : message.text}
         {long && (
           <button type="button" className="link-button unfold" onClick={() => setExpanded((open) => !open)}>

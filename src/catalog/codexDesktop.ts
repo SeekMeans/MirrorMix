@@ -7,10 +7,13 @@ import path from "node:path";
  * the names it shows, which folders are projects, and which threads it keeps out of the list.
  */
 export interface CodexDesktopState {
+  /** Metadata survives when paginated history has replaced the rollout file. */
+  threads: Map<string, CodexThreadMetadata>;
   /** Thread id → the name in the sidebar (a rename, or the name Codex generated). */
   names: Map<string, string>;
   /** Project folders in the order the sidebar lists them. */
   projects: string[];
+  projectNames: Map<string, string>;
   /** Canonical project paths, including projects pinned through a thread with no local transcript. */
   pinnedProjects: Set<string>;
   /** Thread id → explicitly assigned project root, including threads run in a subdirectory. */
@@ -30,6 +33,16 @@ export interface CodexDesktopState {
   cliOnly: Set<string>;
 }
 
+export interface CodexThreadMetadata {
+  id: string;
+  cwd: string;
+  title: string;
+  updatedAt: string;
+  historyMode: string;
+  model?: string;
+  effort?: string;
+}
+
 interface Row {
   id: string;
   title: string | null;
@@ -42,6 +55,9 @@ interface Row {
   rollout_path: string | null;
   cwd: string | null;
   is_pinned: number | null;
+  history_mode: string | null;
+  model: string | null;
+  reasoning_effort: string | null;
 }
 
 const cache = new Map<string, { signature: string; state: CodexDesktopState | null }>();
@@ -74,7 +90,7 @@ function stateDatabase(home: string): string | null {
   return best?.file ?? null;
 }
 
-function readRows(file: string): Row[] {
+function openState(file: string) {
   // Loaded without a static import so the test runner does not try to bundle node:sqlite.
   const require = createRequire(import.meta.url);
   const sqlite = require(["node", "sqlite"].join(":")) as {
@@ -83,17 +99,38 @@ function readRows(file: string): Row[] {
       close(): void;
     };
   };
-  const db = new sqlite.DatabaseSync(file, { readOnly: true });
+  return new sqlite.DatabaseSync(file, { readOnly: true });
+}
+
+function readRows(file: string): Row[] {
+  const db = openState(file);
   try {
     const columns = new Set((db.prepare("pragma table_info(threads)").all() as Array<{ name: string }>).map((column) => column.name));
     const pick = (name: string) => (columns.has(name) ? name : `null as ${name}`);
     return db
       .prepare(
-        `select id, ${pick("title")}, ${pick("name")}, ${pick("source")}, ${pick("thread_source")}, ${pick("archived")}, ${pick("recency_at")}, ${pick("updated_at")}, ${pick("rollout_path")}, ${pick("cwd")}, ${pick("is_pinned")} from threads`,
+        `select id, ${pick("title")}, ${pick("name")}, ${pick("source")}, ${pick("thread_source")}, ${pick("archived")}, ${pick("recency_at")}, ${pick("updated_at")}, ${pick("rollout_path")}, ${pick("cwd")}, ${pick("is_pinned")}, ${pick("history_mode")}, ${pick("model")}, ${pick("reasoning_effort")} from threads`,
       )
       .all() as Row[];
   } finally {
     db.close();
+  }
+}
+
+interface ProjectRow { id: string; name: string; path: string }
+
+function readProjects(file: string): ProjectRow[] {
+  try {
+    const db = openState(file);
+    try {
+      return db.prepare(
+        "select p.id, p.name, r.path from projects p join project_roots r on r.project_id = p.id order by p.position, p.id, r.position",
+      ).all() as ProjectRow[];
+    } finally {
+      db.close();
+    }
+  } catch {
+    return [];
   }
 }
 
@@ -106,21 +143,66 @@ function object(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
-/** Older desktop versions stored paths in project-order; newer ones store local-project IDs. */
-function projectFolders(data: Record<string, unknown>): { projects: string[]; threadRoots: Map<string, string>; pinnedProjects: Set<string> } {
+function ownerAtoms(data: Record<string, unknown>): Record<string, unknown> {
+  const owner = data["electron-renderer-content-owner"];
+  if (typeof owner === "string") return object(data[`electron-owner-atoms:${owner}`]);
+  const keys = Object.keys(data).filter((key) => key.startsWith("electron-owner-atoms:"));
+  return object(data[keys.length === 1 ? keys[0] : "electron-persisted-atom-state"]);
+}
+
+/** Project order omits projects moved to custom sections; resolve those separately by their item keys. */
+function projectFolders(data: Record<string, unknown>, databaseProjects: ProjectRow[]) {
   const byId = new Map<string, string[]>();
+  const projectNames = new Map<string, string>();
+  const isRoot = (root: string) => path.isAbsolute(root) || path.win32.isAbsolute(root);
   for (const [key, value] of Object.entries(object(data["local-projects"]))) {
     const project = object(value);
-    const roots = strings(project.rootPaths).filter((root) => path.isAbsolute(root) || path.win32.isAbsolute(root));
+    const roots = strings(project.rootPaths).filter(isRoot);
     if (!roots.length) continue;
     byId.set(key, roots);
     if (typeof project.id === "string") byId.set(project.id, roots);
+    if (typeof project.name === "string" && project.name.trim()) {
+      for (const root of roots) projectNames.set(codexPathKey(root), project.name.trim());
+    }
+  }
+  const databaseRoots = new Map<string, string[]>();
+  for (const row of databaseProjects) {
+    if (!isRoot(row.path)) continue;
+    const roots = databaseRoots.get(row.id) ?? [];
+    roots.push(row.path);
+    databaseRoots.set(row.id, roots);
+    if (row.name.trim()) projectNames.set(codexPathKey(row.path), row.name.trim());
+  }
+  for (const [id, roots] of databaseRoots) byId.set(id, roots);
+  for (const map of Object.values(object(data["app-server-project-id-by-legacy-project-id-by-host"]))) {
+    for (const [id, target] of Object.entries(object(map))) {
+      const roots = typeof target === "string" ? databaseRoots.get(target) : undefined;
+      if (roots) byId.set(id, roots);
+    }
+  }
+  const atoms = ownerAtoms(data);
+  const projectPrefix = "codex:project:";
+  const itemRoots = (key: string) => key.startsWith(projectPrefix) ? byId.get(key.slice(projectPrefix.length)) ?? [] : [];
+  const sectionRoots: string[] = [];
+  for (const value of Object.values(object(atoms["sidebar-custom-sections-v3"]))) {
+    const { sections } = object(value);
+    if (!Array.isArray(sections)) continue;
+    for (const section of sections) {
+      sectionRoots.push(...strings(object(section).itemKeys).flatMap(itemRoots));
+    }
   }
   const seen = new Set<string>();
-  const resolveProject = (entry: string) => byId.get(entry) ?? (path.isAbsolute(entry) || path.win32.isAbsolute(entry) ? [entry] : []);
+  const resolveProject = (entry: string) => byId.get(entry) ?? (isRoot(entry) ? [entry] : []);
   const pinnedRoots = strings(data["pinned-project-ids"]).flatMap(resolveProject);
   const pinnedProjects = new Set(pinnedRoots.map(codexPathKey));
-  const projects = [...pinnedRoots, ...[...strings(data["project-order"]), ...strings(data["electron-saved-workspace-roots"])].flatMap(resolveProject)]
+  const projects = [
+    ...pinnedRoots,
+    ...strings(data["project-order"]).flatMap(resolveProject),
+    ...strings(atoms["unified-sidebar-project-order-v1"]).flatMap(itemRoots),
+    ...sectionRoots,
+    ...strings(data["electron-saved-workspace-roots"]).flatMap(resolveProject),
+    ...[...databaseRoots.values()].flat(),
+  ]
     .filter((root) => {
       const key = codexPathKey(root);
       if (seen.has(key)) return false;
@@ -134,7 +216,7 @@ function projectFolders(data: Record<string, unknown>): { projects: string[]; th
     const roots = byId.get(assignment.projectId);
     if (roots?.length) threadRoots.set(id.toLowerCase(), roots[0]);
   }
-  return { projects, threadRoots, pinnedProjects };
+  return { projects, projectNames, threadRoots, pinnedProjects };
 }
 
 /** Codex stores Windows paths with a `\\?\` prefix; the folders are the same ones. */
@@ -160,22 +242,20 @@ export function codexDesktopState(sessionsDir: string): CodexDesktopState | null
   }
 
   let state: CodexDesktopState | null = null;
-  if (existsSync(globalFile)) {
+  if (existsSync(globalFile) || database) {
+    const threads = new Map<string, CodexThreadMetadata>();
     const names = new Map<string, string>();
     const subagents = new Set<string>();
     const archived = new Set<string>();
     const recency = new Map<string, string>();
     const rolloutPaths = new Map<string, string>();
     const cliOnly = new Set<string>();
-    let projects: string[] = [];
-    let pinnedProjects = new Set<string>();
     let pinnedThreads = new Set<string>();
-    let threadRoots = new Map<string, string>();
     let projectless = new Set<string>();
     let projectlessRoot = "";
+    let data: Record<string, unknown> = {};
     try {
-      const data = JSON.parse(readFileSync(globalFile, "utf8")) as Record<string, unknown>;
-      ({ projects, threadRoots, pinnedProjects } = projectFolders(data));
+      data = object(JSON.parse(readFileSync(globalFile, "utf8")));
       pinnedThreads = new Set(strings(data["pinned-thread-ids"]).map(id => id.trim().toLowerCase()));
       projectless = new Set(strings(data["projectless-thread-ids"]).map((id) => id.toLowerCase()));
       const hints = data["thread-workspace-root-hints"];
@@ -185,6 +265,7 @@ export function codexDesktopState(sessionsDir: string): CodexDesktopState | null
     } catch {
       /* a half-written state file: fall through with what was read */
     }
+    const { projects, projectNames, threadRoots, pinnedProjects } = projectFolders(data, database ? readProjects(database) : []);
     if (database) {
       try {
         for (const row of readRows(database)) {
@@ -205,6 +286,13 @@ export function codexDesktopState(sessionsDir: string): CodexDesktopState | null
           if (title) names.set(id, title);
           const at = row.recency_at || row.updated_at;
           if (at) recency.set(id, new Date(at * 1000).toISOString());
+          if (row.cwd) threads.set(id, {
+            id, cwd: plainPath(row.cwd), title: title || id,
+            updatedAt: new Date((row.updated_at || at || 0) * 1000).toISOString(),
+            historyMode: row.history_mode ?? "legacy",
+            ...(row.model ? { model: row.model } : {}),
+            ...(row.reasoning_effort ? { effort: row.reasoning_effort } : {}),
+          });
         }
       } catch {
         /* the database is locked or from a version this does not know: names fall back to the index */
@@ -226,7 +314,7 @@ export function codexDesktopState(sessionsDir: string): CodexDesktopState | null
     } catch {
       /* no index yet */
     }
-    state = { names, projects, pinnedProjects, threadRoots, projectless, projectlessRoot, subagents, archived, recency, rolloutPaths, cliOnly };
+    state = { threads, names, projects, projectNames, pinnedProjects, threadRoots, projectless, projectlessRoot, subagents, archived, recency, rolloutPaths, cliOnly };
   }
   cache.set(home, { signature, state });
   latest = state;

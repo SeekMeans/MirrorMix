@@ -170,14 +170,14 @@ const supervisor = createSupervisor({
   submitDesktop: (title, text) => desktop.submit(title, text),
   claudeSignedIn: () => claudeHostSignedIn(),
   stopDesktop: (title) => desktop.stop(title),
-  stopCodex: (title) => codexDesktop.stop(title),
+  stopCodex: (title, id) => codexDesktop.stop(title, id),
   // A session made on the web starts in the Claude app when it is open, so the app lists it as well.
   createDesktop: desktopOnly ? undefined : (folder, text) => desktop.create(folder, text),
   desktopCanCreate: async () => detectTools(listProcesses()).claude.running && !(await workstation.locked()),
   findClaudeInbox: (id, skipPids) => claudeInboxForSession(id, skipPids, Date.now(), claudeHostSession(roots.claudeDataDir, id) ?? ""),
   // A Codex thread open in the Codex app gets its messages there; without the app (or while the screen is locked)
   // MirrorMix's own Codex takes them, except in desktop-only mode, which never starts one.
-  submitCodex: (title, text) => codexDesktop.submit(title, text),
+  submitCodex: (title, text, id) => codexDesktop.submit(title, text, id),
   // Outside desktop-only mode a thread counts as the app's only while the app is open; otherwise MirrorMix runs it.
   codexDesktopSession: (id) =>
     desktopOnly || detectTools(listProcesses()).codex.running ? codexDesktopSession(roots.codexSessionsDir, id) : null,
@@ -292,6 +292,7 @@ const server = createApp(supervisor, settings, {
       env: plainEnv(),
     });
     return {
+      pid: terminal.pid,
       write(data) {
         terminal.write(data);
       },

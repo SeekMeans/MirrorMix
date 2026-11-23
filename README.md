@@ -13,6 +13,8 @@ Requires **Node.js 22+** (uses `node:sqlite`).
 - Browse and continue Claude Code, Codex, and Cursor sessions on this PC
 - Send from the web UI into the desktop window when possible; fall back to CLI / queue paths when the screen is locked or the window cannot take input
 - Shared project terminals per workspace folder, global shortcut commands, plugins (command tasks, schedules, SSH)
+- Named project services in the terminal, with suggested start commands and per-service start, stop and restart
+- Read-only Codex paginated SQLite history alongside JSONL transcripts
 - Optional remote access via your own tunnel or reverse proxy (still bound to localhost on the app side)
 
 ## Quick start

@@ -10,6 +10,7 @@ import { liveTurnBubbles, mergeLiveTurn, parseCursorBubbles, parseCursorJsonl } 
 import { unseenClaudeSessionIds, unseenCodexSessionIds } from "./attention";
 import { archivedClaudeSessionIds, archivedCodexSessionIds, foldedClaudeSessionIds, isArchivedSessionsDir } from "./archive";
 import { codexDesktopState, codexPathKey, codexThreadName, plainPath, type CodexDesktopState } from "./codexDesktop";
+import { isCodexHistoryReference, listCodexSqliteSessions, readCodexSqliteSession } from "./codexSqliteHistory";
 import { cursorMeta, listCursorSessions, pinnedCursorIds, readCursorBubbles } from "./cursor";
 import { pinnedClaudeSessionIds, pinnedCodexSessionIds } from "./pins";
 import { hiddenSessionIds } from "./deleteSession";
@@ -154,6 +155,7 @@ function finishCursor(parsed: ParsedSession, stateDb?: string): ParsedSession {
 }
 
 function readParsed(tool: ToolId, filePath: string, stateDb?: string): ParsedSession | null {
+  if (tool === "codex" && isCodexHistoryReference(filePath)) return readCodexSqliteSession(filePath);
   if (tool === "cursor" && filePath.startsWith("cursor:")) return cursorFromBubbles(filePath.slice("cursor:".length), stateDb);
   const stat = statSync(filePath);
   const hit = cache.get(filePath);
@@ -235,6 +237,11 @@ export function indexSessions(roots: CatalogRoots): { claude: StoredSession[]; c
     if (current && (isActive(current.filePath) || (!isActive(filePath) && current.updatedAt >= parsed.updatedAt))) continue;
     codexById.set(id, { ...parsed, cwd: plainPath(parsed.cwd), ...(name ? { title: name } : {}), filePath });
   }
+  if (desktop) for (const session of listCodexSqliteSessions(roots.codexSessionsDir, desktop.threads)) {
+    const id = session.id.toLowerCase();
+    if (hiddenCodex.has(id) || desktop.subagents.has(id) || desktop.archived.has(id) || desktop.cliOnly.has(id)) continue;
+    codexById.set(id, { ...session, title: desktop.names.get(id) || session.title });
+  }
   const codex = [...codexById.values()];
   const hiddenCursor = hiddenSessionIds(roots.hiddenSessionsFile);
   const cursor = listCursorSessions(roots.cursorStateDb, roots.cursorProjectsDir)
@@ -291,11 +298,16 @@ function groupCodex(sessions: StoredSession[], pinned: Set<string>, unseen: Set<
     }
   }
 
-  const groups: WorkspaceGroup[] = desktop.projects.map((root) => ({
-    path: plainPath(root),
-    missing: !existsSync(plainPath(root)),
-    sessions: summaries(byProject.get(codexPathKey(root)) ?? []),
-  }));
+  const groups: WorkspaceGroup[] = desktop.projects.map((root) => {
+    const key = codexPathKey(root);
+    const projectName = desktop.projectNames.get(key);
+    return {
+      path: plainPath(root),
+      missing: !existsSync(plainPath(root)),
+      sessions: summaries(byProject.get(key) ?? []),
+      ...(projectName ? { projectName } : {}),
+    };
+  });
   if (loose.length) {
     const root = desktop.projectlessRoot ? plainPath(desktop.projectlessRoot) : path.dirname(newestFirst(loose)[0].cwd);
     groups.push({ path: root, label: "任务", missing: !existsSync(root), sessions: summaries(loose) });
