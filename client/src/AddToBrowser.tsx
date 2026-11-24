@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { api, type ToolId } from "./api";
 import { Spinner } from "./icons";
 
+import { tr } from "./i18n";
 /** "+" over a list: add to the floating browser's file list. */
 export const ListAddIcon = () => (
   <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
@@ -65,17 +66,22 @@ export function AddToBrowserDialog({ tool, id, path, name, onClose }: { tool: To
       }}
     >
       <section className="add-browser" role="dialog" aria-modal="true" aria-labelledby="add-browser-title">
-        <h2 id="add-browser-title">加入浏览器列表</h2>
+        <h2 id="add-browser-title">{tr("加入浏览器列表", "Add to the browser list")}</h2>
         <p>
-          把 <strong title={file}>{name}</strong> 加到悬浮操作里“浏览器”的文件列表。以后点浏览器图标，就能直接在新标签页打开它。
+          {tr("把 ", "Add ")}
+          <strong title={file}>{name}</strong>
+          {tr(
+            " 加到悬浮操作里“浏览器”的文件列表。以后点浏览器图标，就能直接在新标签页打开它。",
+            " to the Browser file list in the floating tools. Then the browser icon opens it straight in a new tab.",
+          )}
         </p>
-        <p className="add-browser-note">列表按项目文件夹保存，这个文件夹下的会话共用。</p>
-        {state === "already" && <p className="add-browser-status">它已经在列表里了。</p>}
-        {state === "added" && <p className="add-browser-status is-ok">已加入。</p>}
-        {state === "failed" && <p className="add-browser-status is-bad">没有加入。确认 MirrorMix 还在运行后再试。</p>}
+        <p className="add-browser-note">{tr("列表按项目文件夹保存，这个文件夹下的会话共用。", "The list is kept per project folder and shared by the conversations in it.")}</p>
+        {state === "already" && <p className="add-browser-status">{tr("它已经在列表里了。", "It is already in the list.")}</p>}
+        {state === "added" && <p className="add-browser-status is-ok">{tr("已加入。", "Added.")}</p>}
+        {state === "failed" && <p className="add-browser-status is-bad">{tr("没有加入。确认 MirrorMix 还在运行后再试。", "Not added. Check that MirrorMix is still running, then try again.")}</p>}
         <div className="add-browser-actions">
           <button type="button" className="quiet-button" onClick={onClose}>
-            {state === "already" || state === "added" ? "关闭" : "取消"}
+            {state === "already" || state === "added" ? tr("关闭", "Close") : tr("取消", "Cancel")}
           </button>
           {state !== "already" && state !== "added" && (
             <button
@@ -86,7 +92,7 @@ export function AddToBrowserDialog({ tool, id, path, name, onClose }: { tool: To
               onClick={() => void add()}
             >
               {(state === "checking" || state === "saving") && <Spinner />}
-              加入
+              {tr("加入", "Add")}
             </button>
           )}
         </div>

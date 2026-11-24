@@ -21,6 +21,6 @@ describe("Cursor composer delivery", () => {
   it("shows Cursor's response placeholder while a delivery or reply is in progress", () => {
     expect(conversation).toContain("respondingPlaceholder?: string;");
     expect(conversation).toContain("placeholder={(sending || busy) && respondingPlaceholder ? respondingPlaceholder : placeholder}");
-    expect(app).toContain('respondingPlaceholder={target.tool === "cursor" ? "消息响应中" : undefined}');
+    expect(app).toContain('respondingPlaceholder={target.tool === "cursor" ? tr("消息响应中", "Replying") : undefined}');
   });
 });

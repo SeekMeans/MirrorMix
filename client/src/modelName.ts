@@ -1,3 +1,4 @@
+import { tr } from "./i18n";
 const WORDS: Record<string, string> = {
   gpt: "GPT",
   opus: "Opus",
@@ -10,7 +11,9 @@ const WORDS: Record<string, string> = {
   gemini: "Gemini",
   grok: "Grok",
   mini: "mini",
-  default: "自动",
+  get default() {
+    return tr("自动", "Auto");
+  },
 };
 
 /**

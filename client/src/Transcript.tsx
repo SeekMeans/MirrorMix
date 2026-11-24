@@ -1,6 +1,7 @@
 import { createContext, memo, useContext, useEffect, useState } from "react";
 import type { DiffLine, StepResult, TranscriptMessage } from "./api";
 
+import { tr, useLanguage } from "./i18n";
 /** Which terminal the transcript imitates. Codex draws with other marks than Claude Code. */
 export type Flavor = "claude" | "codex";
 export const FlavorContext = createContext<Flavor>("claude");
@@ -65,6 +66,7 @@ function LiveStatus({ since, tokens, codex }: { since: string; tokens: number; c
 }
 
 export const RoundRow = memo(function RoundRow({ round }: { round: TranscriptMessage }) {
+  useLanguage();
   const codex = useContext(FlavorContext) === "codex";
   if (!round.startedAt) return null;
   if (!round.endedAt) {
@@ -101,15 +103,19 @@ export const RoundRow = memo(function RoundRow({ round }: { round: TranscriptMes
 
 /** Under a round MirrorMix closed itself: its last command never answered. */
 function StalledNote({ tool, limitMs }: { tool: string; limitMs: number }) {
-  const limit = limitMs >= 60_000 ? `${Math.round(limitMs / 60_000)} 分钟` : "立即返回";
+  const limit = limitMs >= 60_000 ? tr(`${Math.round(limitMs / 60_000)} 分钟`, `${Math.round(limitMs / 60_000)} min`) : tr("立即返回", "return at once");
   return (
     <div className="cc-stalled" role="note">
-      {tool} 已经过了它自己的时限（{limit}）还没有结果，可能卡住了，或在等你批准。这一轮先当作结束，发送下一条消息就能接着做。
+      {tr(
+        `${tool} 已经过了它自己的时限（${limit}）还没有结果，可能卡住了，或在等你批准。这一轮先当作结束，发送下一条消息就能接着做。`,
+        `${tool} has passed its own time limit (${limit}) with no result. It may be stuck or waiting for your approval. This turn is treated as over; send the next message to carry on.`,
+      )}
     </div>
   );
 }
 
 export const ThinkingRow = memo(function ThinkingRow({ message }: { message: TranscriptMessage }) {
+  useLanguage();
   const marks = useMarks();
   // Codex prints its reasoning headings inline; Claude Code folds thinking away.
   if (marks.bullet === "•") {
@@ -210,6 +216,7 @@ function TodoCard({ step }: { step: TranscriptMessage }) {
 }
 
 export const StepRow = memo(function StepRow({ step }: { step: TranscriptMessage }) {
+  useLanguage();
   const [wrap, setWrap] = useState(false);
   const marks = useMarks();
   const codex = marks.bullet === "•";

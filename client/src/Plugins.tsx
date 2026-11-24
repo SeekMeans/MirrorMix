@@ -5,6 +5,7 @@ import { BackIcon, ChevronIcon, ClockIcon, CloseIcon, ConsoleIcon, PuzzleIcon, S
 import { SshPlugin } from "./SshPlugin";
 import { jobStatus, oneLine, toolName } from "./text";
 
+import { tr } from "./i18n";
 export type PluginId = "commands" | "schedules" | "ssh";
 
 const LAST_PLUGIN = "mirrormix.plugin";
@@ -32,7 +33,7 @@ interface PluginInfo {
 
 /** Scheduled tasks Claude and Codex created, read from their own files. */
 function JobList({ jobs, placeOf }: PluginContext) {
-  if (jobs.length === 0) return <p className="blank">Claude 和 Codex 都还没有定时任务。在它们各自的界面里创建后，会列在这里。</p>;
+  if (jobs.length === 0) return <p className="blank">{tr("Claude 和 Codex 都还没有定时任务。在它们各自的界面里创建后，会列在这里。", "Neither Claude nor Codex has scheduled tasks yet. Once you create them in their own apps, they are listed here.")}</p>;
   return (
     <>
       {jobs.map((job) => (
@@ -48,19 +49,19 @@ function JobList({ jobs, placeOf }: PluginContext) {
               </span>
             </span>
             <span className="job-meta">
-              {toolName[job.tool]}，{job.cadence || "没有排期"}
+              {toolName[job.tool]}{tr("，", ", ")}{job.cadence || tr("没有排期", "No schedule")}
             </span>
             <span className="job-toggle">
-              <span className="job-expand">展开详情</span>
-              <span className="job-collapse">收起详情</span>
+              <span className="job-expand">{tr("展开详情", "Show details")}</span>
+              <span className="job-collapse">{tr("收起详情", "Hide details")}</span>
             </span>
           </summary>
           <div className="job-details">
-            <h3>任务内容</h3>
-            <p className="job-prompt">{job.prompt.trim() ? job.prompt : "没有任务说明"}</p>
+            <h3>{tr("任务内容", "Task")}</h3>
+            <p className="job-prompt">{job.prompt.trim() ? job.prompt : tr("没有任务说明", "No description")}</p>
             {job.location && (
               <>
-                <h3>运行位置</h3>
+                <h3>{tr("运行位置", "Runs in")}</h3>
                 <p className="job-location" title={job.location}>
                   {placeOf(job)}
                 </p>
@@ -77,22 +78,34 @@ function JobList({ jobs, placeOf }: PluginContext) {
 export const PLUGINS: PluginInfo[] = [
   {
     id: "commands",
-    name: "命令任务",
-    lead: "在指定目录里执行命令：一次性的跑完就结束，持续运行的（如 npm run dev）会显示进程号和状态。",
+    get name() {
+      return tr("命令任务", "Command tasks");
+    },
+    get lead() {
+      return tr("在指定目录里执行命令：一次性的跑完就结束，持续运行的（如 npm run dev）会显示进程号和状态。", "Run commands in a folder: one-off ones end when done; long-running ones (like npm run dev) show their process ID and state.");
+    },
     Icon: ConsoleIcon,
     render: () => <CommandTasks />,
   },
   {
     id: "schedules",
-    name: "定时任务",
-    lead: "Claude 和 Codex 里创建的定时任务会列在这里。",
+    get name() {
+      return tr("定时任务", "Scheduled tasks");
+    },
+    get lead() {
+      return tr("Claude 和 Codex 里创建的定时任务会列在这里。", "Scheduled tasks created in Claude and Codex are listed here.");
+    },
     Icon: ClockIcon,
     render: (context) => <JobList {...context} />,
   },
   {
     id: "ssh",
-    name: "SSH 连接",
-    lead: "连接服务器：多标签终端、SFTP 文件、密钥和代码片段。密码和私钥加密保存在这台电脑上。",
+    get name() {
+      return tr("SSH 连接", "SSH");
+    },
+    get lead() {
+      return tr("连接服务器：多标签终端、SFTP 文件、密钥和代码片段。密码和私钥加密保存在这台电脑上。", "Connect to servers: tabbed terminals, SFTP files, keys and snippets. Passwords and private keys are stored encrypted on this computer.");
+    },
     Icon: ServerIcon,
     render: (context) => <SshPlugin mobile={context.mobile} headerSlot={context.headerSlot} />,
     wide: true,
@@ -122,7 +135,7 @@ export function PluginMarket({
                 <Icon />
               </span>
               <strong>{name}</strong>
-              {added && <span className="plugin-badge">已添加</span>}
+              {added && <span className="plugin-badge">{tr("已添加", "Added")}</span>}
             </div>
             <p>{lead}</p>
             <div className="plugin-card-foot">
@@ -132,7 +145,7 @@ export function PluginMarket({
                 disabled={busy || installed === null}
                 onClick={() => onChange(id, !added)}
               >
-                {added ? "从我的插件移除" : "添加到我的插件"}
+                {added ? tr("从我的插件移除", "Remove from My plugins") : tr("添加到我的插件", "Add to My plugins")}
               </button>
             </div>
           </li>
@@ -250,9 +263,9 @@ export function PluginsDialog({
       <span className="plugins-empty-icon">
         <PuzzleIcon />
       </span>
-      <p>还没有添加插件。到设置里的“插件市场”挑选需要的插件。</p>
+      <p>{tr("还没有添加插件。到设置里的“插件市场”挑选需要的插件。", "No plugins added yet. Pick the ones you need in Settings → Plugin market.")}</p>
       <button type="button" className="quiet-button is-primary" onClick={onOpenMarket}>
-        打开插件市场
+        {tr("打开插件市场", "Open the plugin market")}
       </button>
     </div>
   );
@@ -261,10 +274,10 @@ export function PluginsDialog({
     const shown = list.find((plugin) => plugin.id === chosen) ?? list[0] ?? null;
     return (
       <div className="plugin-desk">
-        <nav className="plugin-desk-nav" aria-label="我的插件">
+        <nav className="plugin-desk-nav" aria-label={tr("我的插件", "My plugins")}>
           <header className="plugin-desk-head">
-            <h2>我的插件</h2>
-            <span>{list.length ? `${list.length} 个` : ""}</span>
+            <h2>{tr("我的插件", "My plugins")}</h2>
+            <span>{list.length ? tr(`${list.length} 个`, `${list.length}`) : ""}</span>
           </header>
           <ul className="plugin-desk-list">
             {list.map(({ id, name, lead, Icon }) => (
@@ -288,13 +301,13 @@ export function PluginsDialog({
           </ul>
           <button type="button" className="plugin-desk-market" onClick={onOpenMarket}>
             <PuzzleIcon />
-            插件市场
+            {tr("插件市场", "Plugin market")}
             <ChevronIcon />
           </button>
         </nav>
         <section className="plugin-desk-main" aria-labelledby="plugin-title">
           {installed === null ? (
-            <p className="blank">正在读取…</p>
+            <p className="blank">{tr("正在读取…", "Loading…")}</p>
           ) : shown ? (
             <>
               {/* The plugin starts right at its own content: the list beside it already names it and says what it does.
@@ -317,7 +330,7 @@ export function PluginsDialog({
       return (
         <section className="settings-page is-sub" aria-labelledby="plugin-title">
           <header className="settings-head settings-subhead">
-            <button type="button" className="icon-button settings-back" aria-label={startWith ? "返回设置" : "返回我的插件"} onClick={closePlugin}>
+            <button type="button" className="icon-button settings-back" aria-label={startWith ? tr("返回设置", "Back to settings") : tr("返回我的插件", "Back to My plugins")} onClick={closePlugin}>
               <BackIcon />
             </button>
             {/* A phone's bar: back and the name. What the plugin does was on the row that opened it. */}
@@ -333,20 +346,20 @@ export function PluginsDialog({
     return (
       <section className="settings-page is-sub" aria-labelledby="plugin-title">
         <header className="settings-head settings-subhead">
-          <button type="button" className="icon-button settings-back" aria-label="返回设置" onClick={onClose}>
+          <button type="button" className="icon-button settings-back" aria-label={tr("返回设置", "Back to settings")} onClick={onClose}>
             <BackIcon />
           </button>
           <div>
-            <h2 id="plugin-title">插件</h2>
+            <h2 id="plugin-title">{tr("插件", "Plugins")}</h2>
           </div>
           {/* The market sits opposite the title: one tap from the list to more plugins. */}
-          <button type="button" className="icon-button plugins-market" aria-label="插件市场" title="插件市场" onClick={onOpenMarket}>
+          <button type="button" className="icon-button plugins-market" aria-label={tr("插件市场", "Plugin market")} title={tr("插件市场", "Plugin market")} onClick={onOpenMarket}>
             <StoreIcon />
           </button>
         </header>
         <div className="settings-body">
           {installed === null ? (
-            <p className="blank">正在读取…</p>
+            <p className="blank">{tr("正在读取…", "Loading…")}</p>
           ) : list.length === 0 ? (
             empty
           ) : (
@@ -356,8 +369,8 @@ export function PluginsDialog({
                 const fact =
                   id === "schedules"
                     ? context.jobs.length
-                      ? `${context.jobs.length} 个定时任务${active ? `，${active} 个已启用` : ""}`
-                      : "还没有定时任务"
+                      ? tr(`${context.jobs.length} 个定时任务${active ? `，${active} 个已启用` : ""}`, `${context.jobs.length} scheduled tasks${active ? `, ${active} active` : ""}`)
+                      : tr("还没有定时任务", "No scheduled tasks yet")
                     : "";
                 return (
                   <li key={id}>
@@ -395,22 +408,22 @@ export function PluginsDialog({
         <div className="settings-main">
           <header className="settings-head">
             <div>
-              <h2 id="plugin-title">{current ? current.name : "我的插件"}</h2>
-              <p>{current ? current.lead : "从插件市场添加的插件会列在右侧。"}</p>
+              <h2 id="plugin-title">{current ? current.name : tr("我的插件", "My plugins")}</h2>
+              <p>{current ? current.lead : tr("从插件市场添加的插件会列在右侧。", "Plugins added from the market are listed on the right.")}</p>
             </div>
-            <button type="button" className="icon-button" aria-label="关闭我的插件" ref={closeButton} onClick={onClose}>
+            <button type="button" className="icon-button" aria-label={tr("关闭我的插件", "Close My plugins")} ref={closeButton} onClick={onClose}>
               <CloseIcon />
             </button>
           </header>
           <div className={current?.wide ? "settings-body is-flush" : "settings-body"}>
-            {installed === null ? <p className="blank">正在读取…</p> : current ? current.render(context) : empty}
+            {installed === null ? <p className="blank">{tr("正在读取…", "Loading…")}</p> : current ? current.render(context) : empty}
           </div>
         </div>
 
-        <nav className="settings-nav" aria-label="我的插件">
+        <nav className="settings-nav" aria-label={tr("我的插件", "My plugins")}>
           <div className="brand plugins-brand">
             <PuzzleIcon />
-            <span>我的插件</span>
+            <span>{tr("我的插件", "My plugins")}</span>
           </div>
           {list.map(({ id, name, Icon }) => (
             <button
@@ -426,7 +439,7 @@ export function PluginsDialog({
           ))}
           <button type="button" className="settings-tab plugins-market-link" onClick={onOpenMarket}>
             <ChevronIcon />
-            插件市场
+            {tr("插件市场", "Plugin market")}
           </button>
         </nav>
       </section>

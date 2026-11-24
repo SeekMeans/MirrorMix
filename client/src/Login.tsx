@@ -4,16 +4,17 @@ import { AUTH_EXPIRED } from "./api";
 import { readAuthStatus } from "./authStatus";
 import { Mark, Spinner } from "./icons";
 
+import { tr } from "./i18n";
 type Phase = "checking" | "in" | "out";
 
 function loginError(code: string | undefined, account: string): string {
   if (code === "bad_credentials") {
-    return account ? `用户名或密码不对。这台电脑的账户是 ${account}。` : "用户名或密码不对。";
+    return account ? tr(`用户名或密码不对。这台电脑的账户是 ${account}。`, `Wrong user name or password. This computer's account is ${account}.`) : tr("用户名或密码不对。", "Wrong user name or password.");
   }
-  if (code === "rate_limited") return "试得太勤了，等一会儿再试。";
-  if (code === "bad_origin") return "这个地址没有被允许登录。经过反向代理访问时，在 MIRRORMIX_ALLOWED_ORIGINS 里加上它。";
-  if (code === "locked") return "这个 Windows 账户已被锁定。先别继续试，等大约 10 分钟，或在系统里解锁后再登录。";
-  return "登录没有完成。";
+  if (code === "rate_limited") return tr("试得太勤了，等一会儿再试。", "Too many tries. Wait a moment, then try again.");
+  if (code === "bad_origin") return tr("这个地址没有被允许登录。经过反向代理访问时，在 MIRRORMIX_ALLOWED_ORIGINS 里加上它。", "Signing in is not allowed from this address. When going through a reverse proxy, add it to MIRRORMIX_ALLOWED_ORIGINS.");
+  if (code === "locked") return tr("这个 Windows 账户已被锁定。先别继续试，等大约 10 分钟，或在系统里解锁后再登录。", "This Windows account is locked. Stop trying for now; wait about 10 minutes, or unlock it in Windows, then sign in.");
+  return tr("登录没有完成。", "Sign-in did not complete.");
 }
 
 function Login({ account, expired, onSuccess }: { account: string; expired: boolean; onSuccess: () => void }) {
@@ -53,11 +54,11 @@ function Login({ account, expired, onSuccess }: { account: string; expired: bool
           <Mark />
           <span>MirrorMix</span>
         </div>
-        <h1>登录</h1>
-        {expired && <p className="login-notice" role="alert">登录已失效，请重新登录。</p>}
-        <p className="login-lead">使用这台电脑的 Windows 账户，不要填电脑名。域账户写成 域名\用户名。</p>
+        <h1>{tr("登录", "Sign in")}</h1>
+        {expired && <p className="login-notice" role="alert">{tr("登录已失效，请重新登录。", "Your sign-in has expired. Please sign in again.")}</p>}
+        <p className="login-lead">{tr("使用这台电脑的 Windows 账户，不要填电脑名。域账户写成 域名\\用户名。", "Use this computer's Windows account, without the computer's name. Write a domain account as domain\\user.")}</p>
         <label>
-          用户名
+          {tr("用户名", "User name")}
           <input
             name="username"
             autoComplete="username"
@@ -67,7 +68,7 @@ function Login({ account, expired, onSuccess }: { account: string; expired: bool
           />
         </label>
         <label>
-          密码
+          {tr("密码", "Password")}
           <input
             name="password"
             type="password"
@@ -78,7 +79,7 @@ function Login({ account, expired, onSuccess }: { account: string; expired: bool
         </label>
         {notice && <p className="login-notice">{notice}</p>}
         <button className="send login-submit" type="submit" disabled={busy || !username.trim() || !password}>
-          {busy ? "正在核对" : "进入"}
+          {busy ? tr("正在核对", "Checking") : tr("进入", "Sign in")}
         </button>
       </form>
     </main>

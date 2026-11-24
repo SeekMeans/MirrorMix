@@ -2,20 +2,21 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { api, type RemoteConfig, type RemoteView } from "./api";
 import { EyeIcon, EyeOffIcon, Spinner } from "./icons";
 
-const STATE_TEXT: Record<RemoteView["status"]["state"], string> = {
-  off: "未开启",
-  starting: "正在连接",
-  connected: "已连接",
-  error: "没有连上",
-};
+import { tr } from "./i18n";
+const STATE_TEXT = (): Record<RemoteView["status"]["state"], string> => ({
+  off: tr("未开启", "Off"),
+  starting: tr("正在连接", "Connecting"),
+  connected: tr("已连接", "Connected"),
+  error: tr("没有连上", "Not connected"),
+});
 
 /** Every PC answers under this domain on port 443. The server says so too; this covers an older server. */
 const REMOTE_DOMAIN = "mm.seekmeans.cn";
 
 function errorText(code: string | undefined): string {
-  if (code === "bad_subdomain") return "子域名只能用小写字母、数字和中间的短横线，最长 63 个字符。";
-  if (code === "bad_token") return "连接口令太长了。";
-  return "没有保存。确认 MirrorMix 还在运行，再试一次。";
+  if (code === "bad_subdomain") return tr("子域名只能用小写字母、数字和中间的短横线，最长 63 个字符。", "A subdomain can use lowercase letters, digits and inner hyphens, up to 63 characters.");
+  if (code === "bad_token") return tr("连接口令太长了。", "The connection token is too long.");
+  return tr("没有保存。确认 MirrorMix 还在运行，再试一次。", "Not saved. Check that MirrorMix is still running and try again.");
 }
 
 type Draft = Pick<RemoteConfig, "subdomain"> & { token: string };
@@ -48,7 +49,7 @@ export function RemotePanel() {
       // Keep what the person is typing; only fill the form while it is untouched.
       if (!edited.current) setDraft(draftOf(next));
     } catch {
-      setError("读不到外网访问的设置。确认 MirrorMix 还在运行。");
+      setError(tr("读不到外网访问的设置。确认 MirrorMix 还在运行。", "Cannot read the remote access settings. Check that MirrorMix is still running."));
     }
   }, []);
 
@@ -105,7 +106,7 @@ export function RemotePanel() {
           setDraft((current) => (current ? { ...current, token } : current));
         }
       } catch {
-        setError("读不到保存的口令。");
+        setError(tr("读不到保存的口令。", "Cannot read the saved token."));
       } finally {
         setRevealing(false);
       }
@@ -168,12 +169,12 @@ export function RemotePanel() {
       <div className={`remote-status is-${state}`} role="status" aria-live="polite">
         <div className="remote-status-line">
           {state === "starting" ? <Spinner /> : <span className="dot" aria-hidden="true" />}
-          <strong>{STATE_TEXT[state]}</strong>
+          <strong>{STATE_TEXT()[state]}</strong>
           <button
             type="button"
             role="switch"
             aria-checked={view.enabled}
-            aria-label="开启外网访问"
+            aria-label={tr("开启外网访问", "Turn on remote access")}
             className="switch"
             disabled={saving}
             onClick={() => void save(undefined, !view.enabled)}
@@ -191,29 +192,32 @@ export function RemotePanel() {
               <span>{url}</span>
             )}
             <button type="button" className="link-button" onClick={() => void copy()}>
-              {copied ? "已复制" : "复制地址"}
+              {copied ? tr("已复制", "Copied") : tr("复制地址", "Copy address")}
             </button>
           </div>
         )}
-        {view.enabled && pending && url && <p className="remote-message">子域名改过了，保存后这个地址才生效。</p>}
+        {view.enabled && pending && url && <p className="remote-message">{tr("子域名改过了，保存后这个地址才生效。", "The subdomain changed; this address works once you save.")}</p>}
         {view.enabled && message && <p className="remote-message">{message}</p>}
         {/* Not connected: it tries again by itself after a growing wait, and can be told to try now. */}
         {view.enabled && state === "error" && (
           <div className="remote-retry">
             <span>
               {view.status.retryAt && view.status.retryAt > now
-                ? `${Math.max(1, Math.ceil((view.status.retryAt - now) / 1000))} 秒后自动重试`
-                : "可以手动重试"}
+                ? tr(`${Math.max(1, Math.ceil((view.status.retryAt - now) / 1000))} 秒后自动重试`, `Retrying in ${Math.max(1, Math.ceil((view.status.retryAt - now) / 1000))} s`)
+                : tr("可以手动重试", "You can retry now")}
             </span>
             <button type="button" className="quiet-button" disabled={retrying || saving} onClick={() => void retryNow()}>
               {retrying ? <Spinner /> : null}
-              {retrying ? "正在重试" : "立即重试"}
+              {retrying ? tr("正在重试", "Retrying") : tr("立即重试", "Retry now")}
             </button>
           </div>
         )}
         {!view.enabled && (
           <p className="remote-message">
-            打开后填写子域名和连接口令，两项都在 MirrorMix 小程序里开通地址后显示。MirrorMix 会在后台运行 frpc，通过服务器把这台电脑放到 子域名.{domain} 上，MirrorMix 退出时一起停止。
+            {tr(
+              `打开后填写子域名和连接口令，两项都在 MirrorMix 小程序里开通地址后显示。MirrorMix 会在后台运行 frpc，通过服务器把这台电脑放到 子域名.${domain} 上，MirrorMix 退出时一起停止。`,
+              `Once on, fill in the subdomain and connection token; both show in the MirrorMix mini program after you set up an address. MirrorMix runs frpc in the background to put this computer at subdomain.${domain} through the server, and stops it when MirrorMix exits.`,
+            )}
           </p>
         )}
       </div>
@@ -224,12 +228,12 @@ export function RemotePanel() {
         <>
           <div className="remote-fields">
             <label className="wide">
-              <span>连接口令</span>
+              <span>{tr("连接口令", "Connection token")}</span>
               <div className="remote-secret">
                 <input
                   type={showToken ? "text" : "password"}
                   value={draft.token}
-                  placeholder={view.hasToken ? "已保存。要更换时才填" : "MirrorMix 小程序里显示的连接口令"}
+                  placeholder={view.hasToken ? tr("已保存。要更换时才填", "Saved. Fill in only to change it") : tr("MirrorMix 小程序里显示的连接口令", "The connection token shown in the MirrorMix mini program")}
                   autoComplete="new-password"
                   spellCheck={false}
                   onChange={(event) => change("token", event.target.value)}
@@ -237,9 +241,9 @@ export function RemotePanel() {
                 <button
                   type="button"
                   className="remote-eye"
-                  aria-label={showToken ? "隐藏口令" : "显示口令"}
+                  aria-label={showToken ? tr("隐藏口令", "Hide token") : tr("显示口令", "Show token")}
                   aria-pressed={showToken}
-                  title={showToken ? "隐藏口令" : "显示口令"}
+                  title={showToken ? tr("隐藏口令", "Hide token") : tr("显示口令", "Show token")}
                   disabled={revealing || (!draft.token && !view.hasToken)}
                   onClick={() => void toggleToken()}
                 >
@@ -248,7 +252,7 @@ export function RemotePanel() {
               </div>
             </label>
             <label className="wide">
-              <span>子域名</span>
+              <span>{tr("子域名", "Subdomain")}</span>
               <div className="remote-suffix">
                 <input
                   value={draft.subdomain}
@@ -263,11 +267,11 @@ export function RemotePanel() {
 
           <div className="remote-actions">
             <p className="remote-preview">
-              服务器 {view.server}:{view.serverPort}，由 MirrorMix 内置 frpc.exe 自动连接
+              {tr(`服务器 ${view.server}:${view.serverPort}，由 MirrorMix 内置 frpc.exe 自动连接`, `Server ${view.server}:${view.serverPort}, connected by MirrorMix's built-in frpc.exe`)}
             </p>
             <button type="submit" className="quiet-button" disabled={saving}>
               {saving && <Spinner />}
-              {saving ? "正在保存" : saved ? "已保存" : "保存并重新连接"}
+              {saving ? tr("正在保存", "Saving") : saved ? tr("已保存", "Saved") : tr("保存并重新连接", "Save and reconnect")}
             </button>
           </div>
         </>

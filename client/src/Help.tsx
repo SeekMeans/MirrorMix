@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { HelpEn } from "./HelpEn";
+import { useLanguage } from "./i18n";
 
 function Topic({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -14,8 +16,12 @@ const STATUS_LINE = `"statusLine": {
   "command": "node \\"E:/Me/AIMiss/scripts/claude-statusline.mjs\\""
 }`;
 
-/** How to use MirrorMix, in the order someone meets the features. */
+/** How to use MirrorMix, in the order someone meets the features, in the interface language. */
 export function HelpContent() {
+  return useLanguage() === "en" ? <HelpEn statusLine={STATUS_LINE} /> : <HelpZh />;
+}
+
+function HelpZh() {
   return (
     <div className="help">
       <Topic title="会话列表">

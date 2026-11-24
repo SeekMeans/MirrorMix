@@ -4,6 +4,7 @@ import remarkGfm from "remark-gfm";
 import { commandOf, requestRun } from "./runCommand";
 import { fileOfLink, looksLikeFile, requestOpenFile } from "./openFile";
 
+import { tr, useLanguage } from "./i18n";
 interface HastNode {
   type: string;
   tagName?: string;
@@ -40,8 +41,8 @@ function CodeBlock({ node, children }: { node?: HastNode; children?: ReactNode }
       <button
         type="button"
         className="code-run"
-        aria-label="在命令行里运行"
-        title={`在右上角的命令行里运行\n${command}`}
+        aria-label={tr("在命令行里运行", "Run in the terminal")}
+        title={tr(`在右上角的命令行里运行\n${command}`, `Run in the terminal at the top right\n${command}`)}
         onClick={() => requestRun(command)}
       >
         <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
@@ -54,6 +55,7 @@ function CodeBlock({ node, children }: { node?: HastNode; children?: ReactNode }
 
 /** Parsing markdown is the costly part of a message, so it only happens again when the text changes. */
 export const MarkdownMessage = memo(function MarkdownMessage({ text }: { text: string }) {
+  useLanguage();
   return (
     <div className="markdown">
       <ReactMarkdown
@@ -67,7 +69,7 @@ export const MarkdownMessage = memo(function MarkdownMessage({ text }: { text: s
                 <a
                   href={href}
                   className="file-link"
-                  title={`在资源管理器里打开 ${file}`}
+                  title={tr(`在资源管理器里打开 ${file}`, `Open ${file} in files`)}
                   onClick={(event) => {
                     event.preventDefault();
                     requestOpenFile(file);
@@ -92,7 +94,7 @@ export const MarkdownMessage = memo(function MarkdownMessage({ text }: { text: s
                 className={className ? `${className} file-code` : "file-code"}
                 role="link"
                 tabIndex={0}
-                title={`在资源管理器里打开 ${value}`}
+                title={tr(`在资源管理器里打开 ${value}`, `Open ${value} in files`)}
                 onClick={(event) => {
                   // Inside a link, the link opens it.
                   if (!event.currentTarget.closest("a")) requestOpenFile(value);

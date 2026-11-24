@@ -12,5 +12,7 @@ export default defineConfig({
     root: ".",
     environment: "node",
     include: ["tests/**/*.test.ts"],
+    // The interface copy is checked in Chinese unless a test switches it.
+    setupFiles: ["tests/setup.ts"],
   },
 });

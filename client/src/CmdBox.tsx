@@ -9,6 +9,7 @@ import { ShortcutMenu } from "./ShortcutMenu";
 import { ServiceMenu } from "./ServiceMenu";
 import type { RunRequest } from "./runCommand";
 
+import { tr } from "./i18n";
 const SIZE_KEY = "mirrormix.cmd.size";
 
 interface PanelSize {
@@ -33,10 +34,10 @@ const lastTab = new Map<string, string>();
 
 /** Keys a phone keyboard does not have, sent as the bytes a terminal expects. */
 const PHONE_KEYS: Array<{ label: string; data: string; title: string }> = [
-  { label: "Tab", data: "\t", title: "补全" },
-  { label: "↑", data: "\u001b[A", title: "上一条命令" },
-  { label: "↓", data: "\u001b[B", title: "下一条命令" },
-  { label: "Ctrl+C", data: "\u0003", title: "中断正在运行的命令" },
+  { label: "Tab", data: "\t", get title() { return tr("补全", "Complete"); } },
+  { label: "↑", data: "\u001b[A", get title() { return tr("上一条命令", "Previous command"); } },
+  { label: "↓", data: "\u001b[B", get title() { return tr("下一条命令", "Next command"); } },
+  { label: "Ctrl+C", data: "\u0003", get title() { return tr("中断正在运行的命令", "Interrupt the running command"); } },
   { label: "Esc", data: "\u001b", title: "Esc" },
 ];
 
@@ -264,7 +265,7 @@ export function CmdBox({
     } catch {
       if (contextRef.current !== context || sequence !== readSequence.current) return;
       setTerminals(current => current ?? []);
-      setProblem("项目终端列表没有读取成功。请检查连接和项目目录。");
+      setProblem(tr("项目终端列表没有读取成功。请检查连接和项目目录。", "The project's terminal list did not load. Check the connection and the project folder."));
     }
   }, [tool, id, context, applyList]);
 
@@ -296,7 +297,7 @@ export function CmdBox({
       const result = await api.newTerminal(tool, id);
       if (contextRef.current === context) applyList(result, result.terminal.tid);
     } catch (failure) {
-      if (contextRef.current === context) setProblem((failure as { code?: string }).code === "too_many" ? "一个项目最多开 8 个终端。" : "没有开出新的项目终端。");
+      if (contextRef.current === context) setProblem((failure as { code?: string }).code === "too_many" ? tr("一个项目最多开 8 个终端。", "A project can have up to 8 terminals.") : tr("没有开出新的项目终端。", "No new project terminal was opened."));
     } finally {
       if (contextRef.current === context) { setStarting(false); mutating.current = false; }
     }
@@ -315,7 +316,7 @@ export function CmdBox({
         setClosingTid(null);
       }
     } catch {
-      if (contextRef.current === context) setProblem("终端没有关闭，请刷新列表后重试。");
+      if (contextRef.current === context) setProblem(tr("终端没有关闭，请刷新列表后重试。", "The terminal did not close. Refresh the list and try again."));
     } finally {
       if (contextRef.current === context) { mutating.current = false; setStarting(false); }
     }
@@ -431,28 +432,28 @@ export function CmdBox({
   return (
     <section
       className={mobile ? "cmd-box is-sheet" : "cmd-box"}
-      aria-label={mode === "terminal" ? "会话终端" : "命令行"}
+      aria-label={mode === "terminal" ? tr("会话终端", "Conversation terminal") : tr("命令行", "Terminal")}
       ref={panel}
       style={mobile ? undefined : { width: size.width, height: size.height }}
     >
       <div className="cmd-keys" ref={keysRef}>
-        {mode === "terminal" && <span>会话终端</span>}
+        {mode === "terminal" && <span>{tr("会话终端", "Conversation terminal")}</span>}
         {mode === "cmd" && (
           <>
-        <div className="cmd-tabs" role="tablist" aria-label="命令行">
+        <div className="cmd-tabs" role="tablist" aria-label={tr("命令行", "Terminal")}>
           {(terminals ?? []).map((item) => {
             const current = item.tid === active;
             return (
               <div className={current ? "cmd-tab is-active" : "cmd-tab"} key={item.tid}>
-                <button type="button" role="tab" aria-selected={current} title={`命令行 ${item.label}`} onClick={() => choose(item.tid)}>
+                <button type="button" role="tab" aria-selected={current} title={tr(`命令行 ${item.label}`, `Terminal ${item.label}`)} onClick={() => choose(item.tid)}>
                   {item.label}
                 </button>
                 {current && (
                   <button
                     type="button"
                     className="cmd-tab-close"
-                    aria-label={`关闭命令行 ${item.label}`}
-                    title="关闭项目终端，会停止其中的程序并影响此项目其他会话"
+                    aria-label={tr(`关闭命令行 ${item.label}`, `Close terminal ${item.label}`)}
+                    title={tr("关闭项目终端，会停止其中的程序并影响此项目其他会话", "Close the project terminal; this stops its programs and affects this project's other conversations")}
                     disabled={starting}
                     onClick={() => setClosingTid(item.tid)}
                   >
@@ -465,8 +466,8 @@ export function CmdBox({
           <button
             type="button"
             className="cmd-tab-add"
-            aria-label="再开一个命令行"
-            title="再开一个命令行"
+            aria-label={tr("再开一个命令行", "Open another terminal")}
+            title={tr("再开一个命令行", "Open another terminal")}
             disabled={starting || terminals === null || (terminals?.length ?? 0) >= 8}
             onClick={() => void addTerminal()}
           >
@@ -480,7 +481,7 @@ export function CmdBox({
           aria-controls={open ? "global-shortcut-menu" : undefined}
           onClick={() => { setServicesOpen(false); setOpen((value) => !value); }}
         >
-          <span>{chosen ?? "快捷命令"}</span>
+          <span>{chosen ?? tr("快捷命令", "Shortcuts")}</span>
           <span className="cmd-chevron"><ChevronIcon /></span>
         </button>
         <button
@@ -488,10 +489,10 @@ export function CmdBox({
           className={servicesOpen ? "cmd-pick is-open" : "cmd-pick"}
           aria-expanded={servicesOpen}
           aria-controls={servicesOpen ? "project-service-menu" : undefined}
-          title="一键启动、重启项目的前端和后端"
+          title={tr("一键启动、重启项目的前端和后端", "Start or restart the project's front and back end in one click")}
           onClick={() => { setOpen(false); setServicesOpen((value) => !value); }}
         >
-          <span>启动服务</span>
+          <span>{tr("启动服务", "Services")}</span>
           <span className="cmd-chevron"><ChevronIcon /></span>
         </button>
           </>
@@ -499,8 +500,8 @@ export function CmdBox({
         <button
           type="button"
           className="icon-button"
-          aria-label={mode === "terminal" ? "收起会话终端" : "收起命令行"}
-          title={mode === "terminal" ? cwd : `收起。命令行会在后台继续运行\n${cwd}`}
+          aria-label={mode === "terminal" ? tr("收起会话终端", "Hide the conversation terminal") : tr("收起命令行", "Hide the terminal")}
+          title={mode === "terminal" ? cwd : tr(`收起。命令行会在后台继续运行\n${cwd}`, `Hide. The terminal keeps running in the background\n${cwd}`)}
           onClick={onClose}
         >
           <CloseIcon />
@@ -513,12 +514,12 @@ export function CmdBox({
         )}
       </div>
       {closingTid && mode === "cmd" && <div className="cmd-close-confirm" role="alert">
-        <p>关闭项目终端 {terminals?.find(item => item.tid === closingTid)?.label}？会停止其中的程序，并影响此项目其他会话。</p>
-        <button type="button" disabled={starting} onClick={() => void closeTerminal(closingTid)}>关闭终端</button>
-        <button type="button" disabled={starting} onClick={() => setClosingTid(null)}>取消</button>
+        <p>{tr(`关闭项目终端 ${terminals?.find(item => item.tid === closingTid)?.label ?? ""}？会停止其中的程序，并影响此项目其他会话。`, `Close project terminal ${terminals?.find(item => item.tid === closingTid)?.label ?? ""}? It stops the programs in it and affects this project's other conversations.`)}</p>
+        <button type="button" disabled={starting} onClick={() => void closeTerminal(closingTid)}>{tr("关闭终端", "Close terminal")}</button>
+        <button type="button" disabled={starting} onClick={() => setClosingTid(null)}>{tr("取消", "Cancel")}</button>
       </div>}
       {problem && <p className="cmd-note">{problem}</p>}
-      {mode === "cmd" && terminals?.length === 0 && !problem && <p className="cmd-note">项目暂无终端，点击“＋”新建。服务重启后需重新启动原来运行的程序。</p>}
+      {mode === "cmd" && terminals?.length === 0 && !problem && <p className="cmd-note">{tr("项目暂无终端，点击“＋”新建。服务重启后需重新启动原来运行的程序。", "No terminals in this project. Click ＋ to open one. After a service restart, start the programs that were running again.")}</p>}
       {mode === "terminal" && (
         <TermScreen key="terminal" tool={tool} id={id} tid="" mode="terminal" mobile={mobile} onSocket={scopedSocket} onGone={() => {}} />
       )}
@@ -537,8 +538,8 @@ export function CmdBox({
           <form onSubmit={submitLine}>
             <input
               ref={lineRef}
-              aria-label="要执行的命令"
-              placeholder={ready ? "输入命令，回车执行" : "正在连接命令行"}
+              aria-label={tr("要执行的命令", "Command to run")}
+              placeholder={ready ? tr("输入命令，回车执行", "Type a command, Enter to run") : tr("正在连接命令行", "Connecting the terminal")}
               value={line}
               enterKeyHint="send"
               autoCapitalize="off"
@@ -548,16 +549,16 @@ export function CmdBox({
               onChange={(event) => setLine(event.target.value)}
             />
             <button type="submit" disabled={!ready}>
-              执行
+              {tr("执行", "Run")}
             </button>
           </form>
         </div>
       )}
       {!mobile && (
         <>
-          <button type="button" className="cmd-grip is-x" aria-label="拉宽命令行" onPointerDown={drag("x")} />
-          <button type="button" className="cmd-grip is-y" aria-label="拉高命令行" onPointerDown={drag("y")} />
-          <button type="button" className="cmd-grip is-both" aria-label="拉宽并拉高命令行" onPointerDown={drag("both")} />
+          <button type="button" className="cmd-grip is-x" aria-label={tr("拉宽命令行", "Widen the terminal")} onPointerDown={drag("x")} />
+          <button type="button" className="cmd-grip is-y" aria-label={tr("拉高命令行", "Heighten the terminal")} onPointerDown={drag("y")} />
+          <button type="button" className="cmd-grip is-both" aria-label={tr("拉宽并拉高命令行", "Resize the terminal")} onPointerDown={drag("both")} />
         </>
       )}
     </section>

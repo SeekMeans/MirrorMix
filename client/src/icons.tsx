@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { tr } from "./i18n";
 function Icon({ size = 16, children }: { size?: number; children: ReactNode }) {
   return (
     <svg
@@ -228,7 +229,7 @@ export const ClockIcon = () => <Icon><circle cx="8" cy="8" r="5.5" /><path d="M8
  * Three bars rising and falling in turn: a reply is still being written. Stands in for the word “运行中”,
  * which stays as its accessible name and tooltip. `still` keeps the bars at rest when nothing is running.
  */
-export function BusyIcon({ still = false, label = "运行中" }: { still?: boolean; label?: string }) {
+export function BusyIcon({ still = false, label = tr("运行中", "Running") }: { still?: boolean; label?: string }) {
   return (
     <span className={still ? "busy is-still" : "busy"} role="img" aria-label={label} title={label}>
       <i />
@@ -249,8 +250,8 @@ export function PinIcon() {
 
 export function BoltIcon() {
   return (
-    <svg className="session-bolt" viewBox="0 0 16 16" width="13" height="13" aria-label="有新回复" role="img">
-      <title>有新回复</title>
+    <svg className="session-bolt" viewBox="0 0 16 16" width="13" height="13" aria-label={tr("有新回复", "New reply")} role="img">
+      <title>{tr("有新回复", "New reply")}</title>
       <path fill="currentColor" d="M9.3 1.1 3.1 9h3.7L6 14.9 13 6.7H9.2L9.3 1.1Z" />
     </svg>
   );

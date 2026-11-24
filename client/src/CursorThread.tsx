@@ -3,6 +3,7 @@ import type { TranscriptMessage } from "./api";
 import { MarkdownMessage } from "./MarkdownMessage";
 import { cursorTurns, toolGroupLine, type CursorStepView, type CursorTurnView } from "../../src/transcript/cursor";
 
+import { tr } from "./i18n";
 const LONG_USER_TEXT = 1500;
 
 function UserBubble({ text, pending, queued }: { text: string; pending: boolean; queued: boolean }) {
@@ -10,11 +11,11 @@ function UserBubble({ text, pending, queued }: { text: string; pending: boolean;
   const long = text.length > LONG_USER_TEXT;
   return (
     <div className={pending ? "cursor-user pending" : "cursor-user"}>
-      {queued && <span className="queue-mark">排队</span>}
+      {queued && <span className="queue-mark">{tr("排队", "Queued")}</span>}
       {long && !expanded ? `${text.slice(0, LONG_USER_TEXT)}…` : text}
       {long && (
         <button type="button" className="link-button unfold" onClick={() => setExpanded((open) => !open)}>
-          {expanded ? "收起" : `展开全文（${text.length} 字）`}
+          {expanded ? tr("收起", "Show less") : tr(`展开全文（${text.length} 字）`, `Show all (${text.length} characters)`)}
         </button>
       )}
     </div>

@@ -21,6 +21,7 @@ import { createPortal } from "react-dom";
 import { Select, type SelectOption } from "./Select";
 import { ChevronIcon, CloseIcon, EditIcon, FileIcon, FolderIcon, PlayIcon, PlusIcon, RefreshIcon, SearchIcon, ShieldQuestionIcon, Spinner, StopIcon, TrashIcon, UpIcon } from "./icons";
 
+import { tr, uiLocale } from "./i18n";
 // ---------------------------------------------------------------- server calls
 
 type Fail = Error & { code?: string; status?: number; question?: SshHostKeyQuestion };
@@ -91,49 +92,49 @@ const ssh = {
 };
 void apiRequest;
 
-const MESSAGES: Record<string, string> = {
-  host_required: "请填写主机地址。",
-  bad_host: "主机地址里不能有空格。",
-  bad_port: "端口要在 1–65535 之间。",
-  key_required: "选择一把密钥，或者改用密码登录。",
-  identity_required: "选择一个身份。",
-  username_required: "请填写用户名。",
-  unknown_host: "这台主机已经不在了，刷新一下。",
-  jump_loop: "跳板机绕回了自己，换一台跳板机。",
-  auth_failed: "登录被拒绝：用户名、密码或密钥不对。",
-  timeout: "连接超时，检查地址、端口和网络。",
-  host_not_found: "找不到这个主机名，检查地址拼写或 DNS。",
-  connection_refused: "对方拒绝连接：端口没开或 SSH 服务没运行。",
-  connect_failed: "连不上这台主机。",
-  jump_failed: "跳板机连上了，但它到不了目标主机。",
-  agent_failed: "没连上 SSH Agent：先在 Windows 里启动 OpenSSH Authentication Agent 服务，或打开 Pageant。",
-  shell_failed: "连上了，但对方没有开出终端。",
-  too_many_sessions: "这台主机已经开了 8 个终端，先关掉几个。",
-  bad_key: "这不是一把能识别的私钥。",
-  needs_passphrase: "这把密钥有口令保护，请填写口令。",
-  bad_passphrase: "密钥口令不对。",
-  not_private_key: "这是公钥，请粘贴私钥。",
-  key_in_use: "还有主机或身份在用这把密钥，先换掉再删除。",
-  key_file_missing: "密钥文件找不到了（它是从 ~/.ssh 引用的）。",
-  identity_in_use: "还有主机在用这个身份，先换掉再删除。",
-  command_required: "请填写命令。",
-  snippet_required: "选择要执行的代码片段。",
-  snippet_in_use: "还有任务在用这个片段，先换掉或删除那些任务。",
-  bad_dir: "目录里不能有换行。",
-  unknown_task: "这个任务已经不在了，刷新一下。",
-  task_running: "这个任务正在执行，等它结束或先停止。",
-  unknown_run: "这次执行的记录已经不在了（MirrorMix 重启后不保留）。",
-  no_ssh_config: "没有找到 ~/.ssh/config。",
-  not_found: "文件或文件夹不存在。",
-  permission_denied: "没有权限。",
-  is_directory: "这是文件夹，不能下载。",
-  sftp_failed: "SFTP 打不开：对方可能没有启用 SFTP。",
-  bad_mode: "权限要写成 755 这样的八进制数字。",
-  group_loop: "分组不能放进自己的子分组。",
-};
+const MESSAGES = (): Record<string, string> => ({
+  host_required: tr("请填写主机地址。", "Enter the host address."),
+  bad_host: tr("主机地址里不能有空格。", "The host address cannot contain spaces."),
+  bad_port: tr("端口要在 1–65535 之间。", "The port must be between 1 and 65535."),
+  key_required: tr("选择一把密钥，或者改用密码登录。", "Choose a key, or sign in with a password instead."),
+  identity_required: tr("选择一个身份。", "Choose an identity."),
+  username_required: tr("请填写用户名。", "Enter the user name."),
+  unknown_host: tr("这台主机已经不在了，刷新一下。", "This host is gone; refresh."),
+  jump_loop: tr("跳板机绕回了自己，换一台跳板机。", "The jump host loops back to itself; choose another."),
+  auth_failed: tr("登录被拒绝：用户名、密码或密钥不对。", "Sign-in refused: wrong user name, password or key."),
+  timeout: tr("连接超时，检查地址、端口和网络。", "Connection timed out. Check the address, port and network."),
+  host_not_found: tr("找不到这个主机名，检查地址拼写或 DNS。", "Host name not found. Check the spelling or DNS."),
+  connection_refused: tr("对方拒绝连接：端口没开或 SSH 服务没运行。", "Connection refused: the port is closed or SSH is not running."),
+  connect_failed: tr("连不上这台主机。", "Cannot connect to this host."),
+  jump_failed: tr("跳板机连上了，但它到不了目标主机。", "The jump host connected but cannot reach the target host."),
+  agent_failed: tr("没连上 SSH Agent：先在 Windows 里启动 OpenSSH Authentication Agent 服务，或打开 Pageant。", "Could not reach the SSH agent. Start the OpenSSH Authentication Agent service in Windows, or open Pageant."),
+  shell_failed: tr("连上了，但对方没有开出终端。", "Connected, but the host did not open a terminal."),
+  too_many_sessions: tr("这台主机已经开了 8 个终端，先关掉几个。", "This host already has 8 terminals open; close some first."),
+  bad_key: tr("这不是一把能识别的私钥。", "This is not a private key that can be read."),
+  needs_passphrase: tr("这把密钥有口令保护，请填写口令。", "This key has a passphrase; enter it."),
+  bad_passphrase: tr("密钥口令不对。", "Wrong key passphrase."),
+  not_private_key: tr("这是公钥，请粘贴私钥。", "This is a public key; paste the private key."),
+  key_in_use: tr("还有主机或身份在用这把密钥，先换掉再删除。", "Hosts or identities still use this key. Change them before deleting it."),
+  key_file_missing: tr("密钥文件找不到了（它是从 ~/.ssh 引用的）。", "The key file is missing (it was referenced from ~/.ssh)."),
+  identity_in_use: tr("还有主机在用这个身份，先换掉再删除。", "Hosts still use this identity. Change them before deleting it."),
+  command_required: tr("请填写命令。", "Enter a command."),
+  snippet_required: tr("选择要执行的代码片段。", "Choose the snippet to run."),
+  snippet_in_use: tr("还有任务在用这个片段，先换掉或删除那些任务。", "Tasks still use this snippet. Change or delete them first."),
+  bad_dir: tr("目录里不能有换行。", "The folder cannot contain line breaks."),
+  unknown_task: tr("这个任务已经不在了，刷新一下。", "This task is gone; refresh."),
+  task_running: tr("这个任务正在执行，等它结束或先停止。", "This task is running. Wait for it or stop it first."),
+  unknown_run: tr("这次执行的记录已经不在了（MirrorMix 重启后不保留）。", "This run's record is gone (it is not kept across MirrorMix restarts)."),
+  no_ssh_config: tr("没有找到 ~/.ssh/config。", "~/.ssh/config was not found."),
+  not_found: tr("文件或文件夹不存在。", "The file or folder does not exist."),
+  permission_denied: tr("没有权限。", "Permission denied."),
+  is_directory: tr("这是文件夹，不能下载。", "This is a folder and cannot be downloaded."),
+  sftp_failed: tr("SFTP 打不开：对方可能没有启用 SFTP。", "SFTP will not open; the host may not have SFTP enabled."),
+  bad_mode: tr("权限要写成 755 这样的八进制数字。", "Write permissions as an octal number like 755."),
+  group_loop: tr("分组不能放进自己的子分组。", "A group cannot go inside its own subgroup."),
+});
 const explain = (error: unknown) => {
   const code = (error as Fail)?.code ?? "";
-  return MESSAGES[code] ?? (code ? `操作失败（${code}）` : "操作失败，稍后再试。");
+  return MESSAGES()[code] ?? (code ? tr(`操作失败（${code}）`, `Failed (${code})`) : tr("操作失败，稍后再试。", "That failed. Try again later."));
 };
 
 // ---------------------------------------------------------------- small pieces
@@ -175,7 +176,7 @@ function size(bytes: number) {
   return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
 }
 
-const when = (ms?: number) => (ms ? new Date(ms).toLocaleString("zh-CN", { hour12: false }) : "—");
+const when = (ms?: number) => (ms ? new Date(ms).toLocaleString(uiLocale(), { hour12: false }) : "—");
 
 // ---------------------------------------------------------------- host key question
 
@@ -183,26 +184,33 @@ function HostKeyDialog({ question, onTrust, onCancel }: { question: SshHostKeyQu
   return (
     <div className="ssh-modal" role="alertdialog" aria-labelledby="ssh-hostkey-title">
       <div className="ssh-modal-card">
-        <h3 id="ssh-hostkey-title">{question.previous ? "主机密钥变了" : "第一次连接这台主机"}</h3>
+        <h3 id="ssh-hostkey-title">{question.previous ? tr("主机密钥变了", "The host key changed") : tr("第一次连接这台主机", "First connection to this host")}</h3>
         {question.previous ? (
           <p className="ssh-warning">
-            {question.address} 的主机密钥和之前保存的不一样。可能是服务器重装了，也可能有人在中间冒充它。确认是你自己换的再继续。
+            {tr(
+              `${question.address} 的主机密钥和之前保存的不一样。可能是服务器重装了，也可能有人在中间冒充它。确认是你自己换的再继续。`,
+              `${question.address}'s host key differs from the saved one. The server may have been reinstalled, or someone may be impersonating it. Continue only if you changed it yourself.`,
+            )}
           </p>
         ) : (
-          <p>确认下面的指纹和服务器上 <code>ssh-keygen -lf /etc/ssh/ssh_host_*_key.pub</code> 显示的一致，再信任它。</p>
+          <p>
+            {tr("确认下面的指纹和服务器上 ", "Check that the fingerprint below matches what ")}
+            <code>ssh-keygen -lf /etc/ssh/ssh_host_*_key.pub</code>
+            {tr(" 显示的一致，再信任它。", " shows on the server, then trust it.")}
+          </p>
         )}
         <dl className="ssh-hostkey">
-          <dt>主机</dt>
+          <dt>{tr("主机", "Host")}</dt>
           <dd>{question.address}</dd>
-          <dt>类型</dt>
+          <dt>{tr("类型", "Type")}</dt>
           <dd>{question.keyType}</dd>
-          <dt>指纹</dt>
+          <dt>{tr("指纹", "Fingerprint")}</dt>
           <dd>
             <code>{question.fingerprint}</code>
           </dd>
           {question.previous && (
             <>
-              <dt>之前的</dt>
+              <dt>{tr("之前的", "Previous")}</dt>
               <dd>
                 <code>{question.previous}</code>
               </dd>
@@ -211,10 +219,10 @@ function HostKeyDialog({ question, onTrust, onCancel }: { question: SshHostKeyQu
         </dl>
         <div className="ssh-modal-actions">
           <button type="button" className="quiet-button" onClick={onCancel}>
-            取消
+            {tr("取消", "Cancel")}
           </button>
           <button type="button" className={question.previous ? "quiet-button is-danger" : "quiet-button is-primary"} onClick={onTrust}>
-            {question.previous ? "替换并连接" : "信任并连接"}
+            {question.previous ? tr("替换并连接", "Replace and connect") : tr("信任并连接", "Trust and connect")}
           </button>
         </div>
       </div>
@@ -283,7 +291,7 @@ function SshScreen({ tid, mobile, onGone }: { tid: string; mobile: boolean; onGo
         setReady(false);
         if (closed) return;
         if (event.code === 4404 || event.code === 4000) {
-          term.write("\r\n\x1b[90m[连接已结束]\x1b[0m\r\n");
+          term.write(`\r\n\x1b[90m${tr("[连接已结束]", "[Connection closed]")}\x1b[0m\r\n`);
           goneRef.current();
           return;
         }
@@ -329,7 +337,7 @@ function SshScreen({ tid, mobile, onGone }: { tid: string; mobile: boolean; onGo
       <div className="ssh-screen" ref={host} />
       {mobile && (
         <div className="cmd-line ssh-line">
-          <div className="cmd-line-keys" aria-label="快捷键">
+          <div className="cmd-line-keys" aria-label={tr("快捷键", "Keys")}>
             {[
               ["Esc", "\x1b"],
               ["Tab", "\t"],
@@ -348,8 +356,8 @@ function SshScreen({ tid, mobile, onGone }: { tid: string; mobile: boolean; onGo
           <form onSubmit={submitLine}>
             <input
               ref={lineRef}
-              aria-label="要执行的命令"
-              placeholder={ready ? "输入命令，回车执行" : "正在连接 SSH"}
+              aria-label={tr("要执行的命令", "Command to run")}
+              placeholder={ready ? tr("输入命令，回车执行", "Type a command, Enter to run") : tr("正在连接 SSH", "Connecting SSH")}
               value={line}
               enterKeyHint="send"
               autoCapitalize="off"
@@ -358,7 +366,7 @@ function SshScreen({ tid, mobile, onGone }: { tid: string; mobile: boolean; onGo
               spellCheck={false}
               onChange={(event) => setLine(event.target.value)}
             />
-            <button type="submit" disabled={!ready}>执行</button>
+            <button type="submit" disabled={!ready}>{tr("执行", "Run")}</button>
           </form>
         </div>
       )}
@@ -432,11 +440,11 @@ function SftpPanel({ host, onError, onHostKey }: { host: SshHostView; onError: (
   const upload = async (files: FileList | File[]) => {
     const list = [...files];
     for (const [index, file] of list.entries()) {
-      setUploading(`正在上传 ${index + 1}/${list.length}：${file.name}`);
+      setUploading(tr(`正在上传 ${index + 1}/${list.length}：${file.name}`, `Uploading ${index + 1}/${list.length}: ${file.name}`));
       try {
         await ssh.sftpUpload(host.id, join(dir, file.name), file);
       } catch (error) {
-        onError(`${file.name}：${explain(error)}`);
+        onError(tr(`${file.name}：${explain(error)}`, `${file.name}: ${explain(error)}`));
       }
     }
     setUploading("");
@@ -462,10 +470,10 @@ function SftpPanel({ host, onError, onHostKey }: { host: SshHostView; onError: (
       }}
     >
       <div className="sftp-bar">
-        <button type="button" className="icon-button" title="上一级" disabled={!dir || dir === "/"} onClick={() => void load(parent(dir))}>
+        <button type="button" className="icon-button" title={tr("上一级", "Up")} disabled={!dir || dir === "/"} onClick={() => void load(parent(dir))}>
           <UpIcon />
         </button>
-        <nav className="sftp-crumbs" aria-label="路径">
+        <nav className="sftp-crumbs" aria-label={tr("路径", "Path")}>
           <button type="button" onClick={() => void load("/")}>
             /
           </button>
@@ -476,22 +484,22 @@ function SftpPanel({ host, onError, onHostKey }: { host: SshHostView; onError: (
           ))}
         </nav>
         <span className="sftp-tools">
-          <input className="ssh-search-input" placeholder="筛选" value={filter} onChange={(event) => setFilter(event.target.value)} />
-          <button type="button" className="icon-button" title="刷新" onClick={() => void load(dir)}>
+          <input className="ssh-search-input" placeholder={tr("筛选", "Filter")} value={filter} onChange={(event) => setFilter(event.target.value)} />
+          <button type="button" className="icon-button" title={tr("刷新", "Refresh")} onClick={() => void load(dir)}>
             {busy ? <Spinner /> : <RefreshIcon />}
           </button>
           <button
             type="button"
             className="quiet-button"
             onClick={() => {
-              const name = window.prompt("新文件夹名称");
+              const name = window.prompt(tr("新文件夹名称", "New folder name"));
               if (name?.trim()) void act(() => ssh.sftpMkdir(host.id, join(dir, name.trim())));
             }}
           >
-            新建文件夹
+            {tr("新建文件夹", "New folder")}
           </button>
           <button type="button" className="quiet-button is-primary" onClick={() => fileInput.current?.click()}>
-            上传
+            {tr("上传", "Upload")}
           </button>
           <input
             ref={fileInput}
@@ -506,18 +514,18 @@ function SftpPanel({ host, onError, onHostKey }: { host: SshHostView; onError: (
         </span>
       </div>
       {uploading && <p className="sftp-note">{uploading}</p>}
-      <div className="sftp-table" role="table" aria-label={`${host.label} 的文件`}>
+      <div className="sftp-table" role="table" aria-label={tr(`${host.label} 的文件`, `${host.label}'s files`)}>
         <div className="sftp-row sftp-head" role="row">
-          <span>名称</span>
-          <span>大小</span>
-          <span>修改时间</span>
-          <span>权限</span>
+          <span>{tr("名称", "Name")}</span>
+          <span>{tr("大小", "Size")}</span>
+          <span>{tr("修改时间", "Modified")}</span>
+          <span>{tr("权限", "Permissions")}</span>
           <span />
         </div>
         {entries === null ? (
-          <p className="blank">{busy ? "正在打开…" : "没有打开"}</p>
+          <p className="blank">{busy ? tr("正在打开…", "Opening…") : tr("没有打开", "Not open")}</p>
         ) : shown.length === 0 ? (
-          <p className="blank">{filter ? "没有匹配的文件" : "空文件夹。把文件拖到这里即可上传。"}</p>
+          <p className="blank">{filter ? tr("没有匹配的文件", "No matching files") : tr("空文件夹。把文件拖到这里即可上传。", "Empty folder. Drag files here to upload.")}</p>
         ) : (
           shown.map((entry) => {
             const full = join(dir, entry.name);
@@ -532,7 +540,7 @@ function SftpPanel({ host, onError, onHostKey }: { host: SshHostView; onError: (
                   ) : (
                     <span title={entry.name}>{entry.name}</span>
                   )}
-                  {entry.link && <em className="sftp-link">链接</em>}
+                  {entry.link && <em className="sftp-link">{tr("链接", "link")}</em>}
                 </span>
                 <span>{entry.dir ? "—" : size(entry.size)}</span>
                 <span>{when(entry.mtime)}</span>
@@ -540,39 +548,39 @@ function SftpPanel({ host, onError, onHostKey }: { host: SshHostView; onError: (
                 <span className="sftp-actions">
                   {!entry.dir && (
                     <a className="quiet-button" href={ssh.downloadUrl(host.id, full)} download={entry.name}>
-                      下载
+                      {tr("下载", "Download")}
                     </a>
                   )}
                   <button
                     type="button"
                     className="quiet-button"
                     onClick={() => {
-                      const name = window.prompt("新名称", entry.name);
+                      const name = window.prompt(tr("新名称", "New name"), entry.name);
                       if (name?.trim() && name.trim() !== entry.name) void act(() => ssh.sftpRename(host.id, full, join(dir, name.trim())));
                     }}
                   >
-                    重命名
+                    {tr("重命名", "Rename")}
                   </button>
                   <button
                     type="button"
                     className="quiet-button"
                     onClick={() => {
-                      const mode = window.prompt("权限（八进制，例如 755）", "");
+                      const mode = window.prompt(tr("权限（八进制，例如 755）", "Permissions (octal, e.g. 755)"), "");
                       if (mode?.trim()) void act(() => ssh.sftpChmod(host.id, full, mode.trim()));
                     }}
                   >
-                    权限
+                    {tr("权限", "Permissions")}
                   </button>
                   <button
                     type="button"
                     className="quiet-button is-danger"
                     onClick={() => {
-                      if (window.confirm(entry.dir ? `删除文件夹“${entry.name}”和里面的所有内容？不能恢复。` : `删除“${entry.name}”？不能恢复。`)) {
+                      if (window.confirm(entry.dir ? tr(`删除文件夹“${entry.name}”和里面的所有内容？不能恢复。`, `Delete the folder "${entry.name}" and everything in it? This cannot be undone.`) : tr(`删除“${entry.name}”？不能恢复。`, `Delete "${entry.name}"? This cannot be undone.`))) {
                         void act(() => ssh.sftpRemove(host.id, full));
                       }
                     }}
                   >
-                    删除
+                    {tr("删除", "Delete")}
                   </button>
                 </span>
               </div>
@@ -586,7 +594,7 @@ function SftpPanel({ host, onError, onHostKey }: { host: SshHostView; onError: (
 
 // ---------------------------------------------------------------- host editor
 
-const AUTH_LABEL: Record<SshAuth, string> = { password: "密码", key: "密钥", identity: "身份", agent: "SSH Agent" };
+const AUTH_LABEL = (): Record<SshAuth, string> => ({ password: tr("密码", "Password"), key: tr("密钥", "Key"), identity: tr("身份", "Identity"), agent: "SSH Agent" });
 
 function HostEditor({
   state,
@@ -662,8 +670,8 @@ function HostEditor({
   return (
     <form className="ssh-editor" onSubmit={submit}>
       <header className="ssh-editor-head">
-        <h3>{host ? "编辑主机" : "新建主机"}</h3>
-        <button type="button" className="icon-button" aria-label="关闭" onClick={onClose}>
+        <h3>{host ? tr("编辑主机", "Edit host") : tr("新建主机", "New host")}</h3>
+        <button type="button" className="icon-button" aria-label={tr("关闭", "Close")} onClick={onClose}>
           <CloseIcon />
         </button>
       </header>
@@ -680,39 +688,40 @@ function HostEditor({
                 setTested("");
                 const ok = await onTest();
                 setTesting(false);
-                if (ok) setTested("连接正常");
+                if (ok) setTested(tr("连接正常", "Connection OK"));
               }}
             >
-              {testing && <Spinner />}测试连接
+              {testing && <Spinner />}
+              {tr("测试连接", "Test connection")}
             </button>
             {onDuplicate && (
               <button type="button" className="quiet-button" onClick={onDuplicate}>
-                复制一份
+                {tr("复制一份", "Duplicate")}
               </button>
             )}
             {onSftp && (
               <button type="button" className="quiet-button" onClick={onSftp}>
-                打开 SFTP
+                {tr("打开 SFTP", "Open SFTP")}
               </button>
             )}
             {tested && <span className="ssh-editor-ok">{tested}</span>}
           </div>
         )}
-        <Field label="地址">
-          <input required autoFocus={!host} placeholder="example.com 或 10.0.0.5" value={form.host} onChange={(event) => set({ host: event.target.value })} />
+        <Field label={tr("地址", "Address")}>
+          <input required autoFocus={!host} placeholder={tr("example.com 或 10.0.0.5", "example.com or 10.0.0.5")} value={form.host} onChange={(event) => set({ host: event.target.value })} />
         </Field>
         <div className="ssh-field-row">
-          <Field label="名称">
-            <input placeholder="不填就用地址" value={form.label} onChange={(event) => set({ label: event.target.value })} />
+          <Field label={tr("名称", "Name")}>
+            <input placeholder={tr("不填就用地址", "Defaults to the address")} value={form.label} onChange={(event) => set({ label: event.target.value })} />
           </Field>
-          <Field label="端口">
+          <Field label={tr("端口", "Port")}>
             <input type="number" min={1} max={65535} value={form.port ?? 22} onChange={(event) => set({ port: Number(event.target.value) })} />
           </Field>
         </div>
-        <Field label="标签">
-          <input placeholder="生产, 数据库" value={tags} onChange={(event) => setTags(event.target.value)} />
+        <Field label={tr("标签", "Tags")}>
+          <input placeholder={tr("生产, 数据库", "production, database")} value={tags} onChange={(event) => setTags(event.target.value)} />
         </Field>
-        <Field label="颜色">
+        <Field label={tr("颜色", "Colour")}>
           <span className="ssh-colors">
             {COLORS.map((color) => (
               <button
@@ -720,7 +729,7 @@ function HostEditor({
                 type="button"
                 className={form.color === color ? "ssh-color is-on" : "ssh-color"}
                 style={{ background: color }}
-                aria-label={`颜色 ${color}`}
+                aria-label={tr(`颜色 ${color}`, `Colour ${color}`)}
                 onClick={() => set({ color: form.color === color ? null : color })}
               />
             ))}
@@ -728,35 +737,35 @@ function HostEditor({
         </Field>
 
         <fieldset className="ssh-fieldset">
-          <legend>登录</legend>
-          <div className="theme-choice ssh-auth" role="radiogroup" aria-label="登录方式">
-            {(Object.keys(AUTH_LABEL) as SshAuth[]).map((auth) => (
+          <legend>{tr("登录", "Sign-in")}</legend>
+          <div className="theme-choice ssh-auth" role="radiogroup" aria-label={tr("登录方式", "Sign-in method")}>
+            {(Object.keys(AUTH_LABEL()) as SshAuth[]).map((auth) => (
               <button key={auth} type="button" role="radio" aria-checked={form.auth === auth} className={form.auth === auth ? "active" : ""} onClick={() => set({ auth })}>
-                {AUTH_LABEL[auth]}
+                {AUTH_LABEL()[auth]}
               </button>
             ))}
           </div>
           {form.auth !== "identity" && (
-            <Field label="用户名">
+            <Field label={tr("用户名", "User name")}>
               <input value={form.username ?? ""} onChange={(event) => set({ username: event.target.value })} />
             </Field>
           )}
           {form.auth === "password" && (
-            <Field label="密码" hint={host?.hasPassword ? "已保存。留空则不修改。" : "加密保存在这台电脑上，只有你的 Windows 账户能解开。"}>
+            <Field label={tr("密码", "Password")} hint={host?.hasPassword ? tr("已保存。留空则不修改。", "Saved. Leave empty to keep it.") : tr("加密保存在这台电脑上，只有你的 Windows 账户能解开。", "Stored encrypted on this computer; only your Windows account can unlock it.")}>
               <input type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} />
               {host?.hasPassword && (
                 <label className="ssh-check">
-                  <input type="checkbox" checked={clearPassword} onChange={(event) => setClearPassword(event.target.checked)} /> 删除已保存的密码
+                  <input type="checkbox" checked={clearPassword} onChange={(event) => setClearPassword(event.target.checked)} /> {tr("删除已保存的密码", "Delete the saved password")}
                 </label>
               )}
             </Field>
           )}
           {form.auth === "key" && (
-            <Field label="密钥" hint={state.keys.length ? undefined : "钥匙串里还没有密钥，先到“钥匙串”生成或导入一把。"}>
+            <Field label={tr("密钥", "Key")} hint={state.keys.length ? undefined : tr("钥匙串里还没有密钥，先到“钥匙串”生成或导入一把。", "The keychain has no keys yet. Generate or import one under Keychain first.")}>
               <Select
-                ariaLabel="密钥"
-                placeholder="选择密钥"
-                empty="钥匙串里还没有密钥"
+                ariaLabel={tr("密钥", "Key")}
+                placeholder={tr("选择密钥", "Choose a key")}
+                empty={tr("钥匙串里还没有密钥", "No keys in the keychain yet")}
                 value={form.keyId ?? ""}
                 onChange={(keyId) => set({ keyId: keyId || null })}
                 options={state.keys.map((key) => ({ value: key.id, label: key.label, hint: `${key.type} · ${key.fingerprint.slice(0, 22)}…`, keywords: key.fingerprint }))}
@@ -764,51 +773,51 @@ function HostEditor({
             </Field>
           )}
           {form.auth === "identity" && (
-            <Field label="身份" hint={state.identities.length ? undefined : "还没有身份，先到“钥匙串”添加。"}>
+            <Field label={tr("身份", "Identity")} hint={state.identities.length ? undefined : tr("还没有身份，先到“钥匙串”添加。", "No identities yet. Add one under Keychain first.")}>
               <Select
-                ariaLabel="身份"
-                placeholder="选择身份"
-                empty="还没有身份"
+                ariaLabel={tr("身份", "Identity")}
+                placeholder={tr("选择身份", "Choose an identity")}
+                empty={tr("还没有身份", "No identities yet")}
                 value={form.identityId ?? ""}
                 onChange={(identityId) => set({ identityId: identityId || null })}
                 options={state.identities.map((identity) => ({
                   value: identity.id,
                   label: identity.label,
-                  hint: `${identity.username}${identity.keyId ? " · 密钥" : identity.hasPassword ? " · 密码" : ""}`,
+                  hint: `${identity.username}${identity.keyId ? tr(" · 密钥", " · key") : identity.hasPassword ? tr(" · 密码", " · password") : ""}`,
                 }))}
               />
             </Field>
           )}
-          {form.auth === "agent" && <p className="ssh-field-hint">使用 Windows 的 OpenSSH Authentication Agent（或 Pageant）里已经加载的密钥。</p>}
+          {form.auth === "agent" && <p className="ssh-field-hint">{tr("使用 Windows 的 OpenSSH Authentication Agent（或 Pageant）里已经加载的密钥。", "Uses the keys already loaded in Windows' OpenSSH Authentication Agent (or Pageant).")}</p>}
         </fieldset>
 
         <fieldset className="ssh-fieldset">
-          <legend>高级</legend>
-          <Field label="连接后运行" hint="终端打开后自动输入的代码片段。">
+          <legend>{tr("高级", "Advanced")}</legend>
+          <Field label={tr("连接后运行", "Run after connecting")} hint={tr("终端打开后自动输入的代码片段。", "A snippet typed in automatically once the terminal opens.")}>
             <Select
-              ariaLabel="连接后运行"
+              ariaLabel={tr("连接后运行", "Run after connecting")}
               value={form.startupSnippetId ?? ""}
               onChange={(startupSnippetId) => set({ startupSnippetId: startupSnippetId || null })}
-              options={[{ value: "", label: "不运行" }, ...state.snippets.map(snippetOption)]}
+              options={[{ value: "", label: tr("不运行", "Nothing") }, ...state.snippets.map(snippetOption)]}
             />
           </Field>
           <div className="ssh-field-row">
-            <Field label="保活（秒）">
+            <Field label={tr("保活（秒）", "Keep-alive (seconds)")}>
               <input type="number" min={0} max={600} value={form.keepAlive ?? 30} onChange={(event) => set({ keepAlive: Number(event.target.value) })} />
             </Field>
-            <Field label="退格键发送">
+            <Field label={tr("退格键发送", "Backspace sends")}>
               <Select
-                ariaLabel="退格键发送"
+                ariaLabel={tr("退格键发送", "Backspace sends")}
                 value={form.backspace ?? "del"}
                 onChange={(backspace) => set({ backspace: backspace === "bs" ? "bs" : "del" })}
                 options={[
-                  { value: "del", label: "DEL", hint: "多数系统" },
-                  { value: "bs", label: "Ctrl+H", hint: "老设备、部分交换机" },
+                  { value: "del", label: "DEL", hint: tr("多数系统", "Most systems") },
+                  { value: "bs", label: "Ctrl+H", hint: tr("老设备、部分交换机", "Older devices, some switches") },
                 ]}
               />
             </Field>
           </div>
-          <Field label="备注">
+          <Field label={tr("备注", "Notes")}>
             <textarea rows={3} value={form.notes ?? ""} onChange={(event) => set({ notes: event.target.value })} />
           </Field>
         </fieldset>
@@ -817,15 +826,16 @@ function HostEditor({
       <footer className="ssh-editor-foot">
         {host && onDelete && (
           <button type="button" className="quiet-button is-danger" onClick={onDelete}>
-            删除主机
+            {tr("删除主机", "Delete host")}
           </button>
         )}
         <span className="ssh-spacer" />
         <button type="button" className="quiet-button" onClick={onClose}>
-          取消
+          {tr("取消", "Cancel")}
         </button>
         <button type="submit" className="quiet-button is-primary" disabled={busy}>
-          {busy && <Spinner />}保存
+          {busy && <Spinner />}
+          {tr("保存", "Save")}
         </button>
       </footer>
     </form>
@@ -835,11 +845,11 @@ function HostEditor({
 // ---------------------------------------------------------------- vault sections
 
 type Section = "hosts" | "tasks" | "keychain" | "snippets";
-const SECTIONS: Array<[Section, string]> = [
-  ["hosts", "主机"],
-  ["tasks", "任务"],
-  ["keychain", "钥匙串"],
-  ["snippets", "代码片段"],
+const SECTIONS = (): Array<[Section, string]> => [
+  ["hosts", tr("主机", "Hosts")],
+  ["tasks", tr("任务", "Tasks")],
+  ["keychain", tr("钥匙串", "Keychain")],
+  ["snippets", tr("代码片段", "Snippets")],
 ];
 
 function HostsSection({
@@ -872,13 +882,13 @@ function HostsSection({
 
   const card = (host: SshHostView) => (
     <li key={host.id} className="ssh-host">
-      <button type="button" className="ssh-host-main" title="连接" onClick={() => onConnect(host)}>
+      <button type="button" className="ssh-host-main" title={tr("连接", "Connect")} onClick={() => onConnect(host)}>
         <Avatar host={host} />
         <span className="ssh-host-text">
           <strong>
             {host.label}
             {!state.knownHosts.some((known) => known.address === `${host.host}:${host.port}`) && (
-              <span className="ssh-host-unverified" title="还没确认过这台主机的密钥：第一次连接时会请你核对指纹" aria-label="主机密钥未确认">
+              <span className="ssh-host-unverified" title={tr("还没确认过这台主机的密钥：第一次连接时会请你核对指纹", "This host's key has not been confirmed yet; you will be asked to check its fingerprint on first connection")} aria-label={tr("主机密钥未确认", "Host key not confirmed")}>
                 <ShieldQuestionIcon />
               </span>
             )}
@@ -897,7 +907,7 @@ function HostsSection({
           )}
         </span>
       </button>
-      <button type="button" className="ssh-host-edit" aria-label={`编辑 ${host.label}`} title="编辑" onClick={() => onEdit(host)}>
+      <button type="button" className="ssh-host-edit" aria-label={tr(`编辑 ${host.label}`, `Edit ${host.label}`)} title={tr("编辑", "Edit")} onClick={() => onEdit(host)}>
         <EditIcon />
       </button>
     </li>
@@ -908,33 +918,33 @@ function HostsSection({
       <div className="ssh-toolbar">
         <label className="ssh-search">
           <SearchIcon />
-          <input placeholder="搜索名称、地址、用户或标签" value={query} onChange={(event) => setQuery(event.target.value)} />
+          <input placeholder={tr("搜索名称、地址、用户或标签", "Search names, addresses, users or tags")} value={query} onChange={(event) => setQuery(event.target.value)} />
         </label>
         <button type="button" className="quiet-button is-primary" onClick={() => onNew()}>
           <PlusIcon />
-          新建主机
+          {tr("新建主机", "New host")}
         </button>
         <button
           type="button"
           className="quiet-button"
-          title="读取 ~/.ssh/config 里的 Host"
+          title={tr("读取 ~/.ssh/config 里的 Host", "Read the Host entries in ~/.ssh/config")}
           onClick={async () => {
             try {
               const result = await ssh.importConfig();
-              setNotice(`从 ~/.ssh/config 导入了 ${result.hosts} 台主机、${result.keys} 把密钥${result.skipped.length ? `，${result.skipped.length} 台已存在` : ""}。`);
+              setNotice(tr(`从 ~/.ssh/config 导入了 ${result.hosts} 台主机、${result.keys} 把密钥${result.skipped.length ? `，${result.skipped.length} 台已存在` : ""}。`, `Imported ${result.hosts} hosts and ${result.keys} keys from ~/.ssh/config${result.skipped.length ? `; ${result.skipped.length} already existed` : ""}.`));
               onChange();
             } catch (error) {
               onError(explain(error));
             }
           }}
         >
-          导入 ~/.ssh/config
+          {tr("导入 ~/.ssh/config", "Import ~/.ssh/config")}
         </button>
       </div>
       {notice && <p className="banner">{notice}</p>}
 
       {allTags.length > 0 && (
-        <div className="ssh-tag-filter" role="group" aria-label="按标签筛选">
+        <div className="ssh-tag-filter" role="group" aria-label={tr("按标签筛选", "Filter by tag")}>
           {allTags.map((item) => (
             <button
               key={item}
@@ -954,7 +964,7 @@ function HostsSection({
         <ul className="ssh-hosts">{hosts.map(card)}</ul>
       ) : (
         <div className="ssh-empty">
-          <p>{state.hosts.length ? "没有匹配的主机。" : "还没有主机。新建一台，或者从 ~/.ssh/config 导入。"}</p>
+          <p>{state.hosts.length ? tr("没有匹配的主机。", "No matching hosts.") : tr("还没有主机。新建一台，或者从 ~/.ssh/config 导入。", "No hosts yet. Add one, or import from ~/.ssh/config.")}</p>
         </div>
       )}
     </div>
@@ -995,12 +1005,12 @@ function KeychainSection({ state, onChange, onError }: { state: SshState; onChan
   return (
     <div className="ssh-section">
       <div className="ssh-toolbar">
-        <h4 className="ssh-title">密钥</h4>
+        <h4 className="ssh-title">{tr("密钥", "Key")}</h4>
         <button type="button" className="quiet-button is-primary" onClick={() => setMode("generate")}>
-          生成密钥
+          {tr("生成密钥", "Generate key")}
         </button>
         <button type="button" className="quiet-button" onClick={() => setMode("import")}>
-          导入私钥
+          {tr("导入私钥", "Import private key")}
         </button>
       </div>
 
@@ -1013,44 +1023,45 @@ function KeychainSection({ state, onChange, onError }: { state: SshState; onChan
           }}
         >
           <div className="ssh-field-row">
-            <Field label="名称">
-              <input autoFocus placeholder="例如 laptop" value={label} onChange={(event) => setLabel(event.target.value)} />
+            <Field label={tr("名称", "Name")}>
+              <input autoFocus placeholder={tr("例如 laptop", "e.g. laptop")} value={label} onChange={(event) => setLabel(event.target.value)} />
             </Field>
-            <Field label="类型">
+            <Field label={tr("类型", "Type")}>
               <Select
-                ariaLabel="密钥类型"
+                ariaLabel={tr("密钥类型", "Key type")}
                 value={type}
                 onChange={setType}
                 options={[
-                  { value: "ed25519", label: "Ed25519", hint: "推荐：短、快、安全" },
-                  { value: "ecdsa", label: "ECDSA", hint: "老一些的系统也支持" },
-                  { value: "rsa", label: "RSA", hint: "兼容最广" },
+                  { value: "ed25519", label: "Ed25519", hint: tr("推荐：短、快、安全", "Recommended: short, fast, secure") },
+                  { value: "ecdsa", label: "ECDSA", hint: tr("老一些的系统也支持", "Older systems support it too") },
+                  { value: "rsa", label: "RSA", hint: tr("兼容最广", "Widest compatibility") },
                 ]}
               />
             </Field>
             {type === "rsa" && (
-              <Field label="位数">
+              <Field label={tr("位数", "Bits")}>
                 <Select
-                  ariaLabel="位数"
+                  ariaLabel={tr("位数", "Bits")}
                   value={String(bits)}
                   onChange={(next) => setBits(Number(next))}
                   options={[
-                    { value: "4096", label: "4096", hint: "推荐" },
+                    { value: "4096", label: "4096", hint: tr("推荐", "Recommended") },
                     { value: "2048", label: "2048" },
                   ]}
                 />
               </Field>
             )}
           </div>
-          <Field label="口令（可选）" hint="给私钥再加一层保护。">
+          <Field label={tr("口令（可选）", "Passphrase (optional)")} hint={tr("给私钥再加一层保护。", "An extra layer of protection for the private key.")}>
             <input type="password" autoComplete="new-password" value={passphrase} onChange={(event) => setPassphrase(event.target.value)} />
           </Field>
           <div className="ssh-form-actions">
             <button type="button" className="quiet-button" onClick={reset}>
-              取消
+              {tr("取消", "Cancel")}
             </button>
             <button type="submit" className="quiet-button is-primary" disabled={busy}>
-              {busy && <Spinner />}生成
+              {busy && <Spinner />}
+              {tr("生成", "Generate")}
             </button>
           </div>
         </form>
@@ -1064,10 +1075,10 @@ function KeychainSection({ state, onChange, onError }: { state: SshState; onChan
             void run(() => ssh.importKey({ label, privateKey, ...(passphrase ? { passphrase } : {}) }));
           }}
         >
-          <Field label="名称">
+          <Field label={tr("名称", "Name")}>
             <input autoFocus value={label} onChange={(event) => setLabel(event.target.value)} />
           </Field>
-          <Field label="私钥" hint="粘贴 OpenSSH 或 PEM 格式的私钥，或选择文件。">
+          <Field label={tr("私钥", "Private key")} hint={tr("粘贴 OpenSSH 或 PEM 格式的私钥，或选择文件。", "Paste an OpenSSH or PEM private key, or choose a file.")}>
             <textarea rows={6} className="ssh-mono" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" value={privateKey} onChange={(event) => setPrivateKey(event.target.value)} />
             <input
               type="file"
@@ -1078,22 +1089,23 @@ function KeychainSection({ state, onChange, onError }: { state: SshState; onChan
               }}
             />
           </Field>
-          <Field label="口令（如果有）">
+          <Field label={tr("口令（如果有）", "Passphrase (if any)")}>
             <input type="password" autoComplete="new-password" value={passphrase} onChange={(event) => setPassphrase(event.target.value)} />
           </Field>
           <div className="ssh-form-actions">
             <button type="button" className="quiet-button" onClick={reset}>
-              取消
+              {tr("取消", "Cancel")}
             </button>
             <button type="submit" className="quiet-button is-primary" disabled={busy || !privateKey.trim()}>
-              {busy && <Spinner />}导入
+              {busy && <Spinner />}
+              {tr("导入", "Import")}
             </button>
           </div>
         </form>
       )}
 
       {state.keys.length === 0 ? (
-        <p className="blank">钥匙串里还没有密钥。</p>
+        <p className="blank">{tr("钥匙串里还没有密钥。", "No keys in the keychain yet.")}</p>
       ) : (
         <ul className="ssh-list">
           {state.keys.map((key: SshKeyView) => (
@@ -1102,8 +1114,8 @@ function KeychainSection({ state, onChange, onError }: { state: SshState; onChan
                 <strong>{key.label}</strong>
                 <span>
                   {key.type} · {key.fingerprint}
-                  {key.hasPassphrase ? " · 有口令" : ""}
-                  {key.file ? ` · 引用 ${key.file}` : ""}
+                  {key.hasPassphrase ? tr(" · 有口令", " · passphrase") : ""}
+                  {key.file ? tr(` · 引用 ${key.file}`, ` · from ${key.file}`) : ""}
                 </span>
               </span>
               <span className="ssh-row-actions">
@@ -1116,16 +1128,16 @@ function KeychainSection({ state, onChange, onError }: { state: SshState; onChan
                     window.setTimeout(() => setCopied(""), 1500);
                   }}
                 >
-                  {copied === key.id ? "已复制" : "复制公钥"}
+                  {copied === key.id ? tr("已复制", "Copied") : tr("复制公钥", "Copy public key")}
                 </button>
-                <a className="quiet-button" href={ssh.privateKeyUrl(key.id)} onClick={(event) => !window.confirm("导出私钥文件？拿到它的人可以登录这把钥匙能登录的所有主机。") && event.preventDefault()}>
-                  导出私钥
+                <a className="quiet-button" href={ssh.privateKeyUrl(key.id)} onClick={(event) => !window.confirm(tr("导出私钥文件？拿到它的人可以登录这把钥匙能登录的所有主机。", "Export the private key file? Anyone who has it can sign in to every host this key can.")) && event.preventDefault()}>
+                  {tr("导出私钥", "Export private key")}
                 </a>
                 <button
                   type="button"
                   className="quiet-button"
                   onClick={async () => {
-                    const name = window.prompt("密钥名称", key.label);
+                    const name = window.prompt(tr("密钥名称", "Key name"), key.label);
                     if (!name?.trim()) return;
                     try {
                       await ssh.renameKey(key.id, name.trim());
@@ -1135,14 +1147,14 @@ function KeychainSection({ state, onChange, onError }: { state: SshState; onChan
                     }
                   }}
                 >
-                  重命名
+                  {tr("重命名", "Rename")}
                 </button>
                 <button
                   type="button"
                   className="quiet-button is-danger"
-                  onClick={() => window.confirm(`从钥匙串删除“${key.label}”？${key.file ? "原文件不会被删除。" : "删除后无法找回，除非你另有备份。"}`) && void run(() => ssh.deleteKey(key.id))}
+                  onClick={() => window.confirm(tr(`从钥匙串删除“${key.label}”？${key.file ? "原文件不会被删除。" : "删除后无法找回，除非你另有备份。"}`, `Delete "${key.label}" from the keychain? ${key.file ? "The original file is not deleted." : "It cannot be recovered unless you have a backup."}`)) && void run(() => ssh.deleteKey(key.id))}
                 >
-                  删除
+                  {tr("删除", "Delete")}
                 </button>
               </span>
             </li>
@@ -1151,10 +1163,10 @@ function KeychainSection({ state, onChange, onError }: { state: SshState; onChan
       )}
 
       <div className="ssh-toolbar ssh-toolbar-gap">
-        <h4 className="ssh-title">身份</h4>
-        <span className="ssh-field-hint">一组用户名和密码（或密钥），多台主机可以共用。</span>
+        <h4 className="ssh-title">{tr("身份", "Identity")}</h4>
+        <span className="ssh-field-hint">{tr("一组用户名和密码（或密钥），多台主机可以共用。", "A user name with a password (or key) that several hosts can share.")}</span>
         <button type="button" className="quiet-button" onClick={() => setMode("identity")}>
-          添加身份
+          {tr("添加身份", "Add identity")}
         </button>
       </div>
       {mode === "identity" && (
@@ -1174,38 +1186,38 @@ function KeychainSection({ state, onChange, onError }: { state: SshState; onChan
           }}
         >
           <div className="ssh-field-row">
-            <Field label="名称">
+            <Field label={tr("名称", "Name")}>
               <input value={identity.label} onChange={(event) => setIdentity({ ...identity, label: event.target.value })} />
             </Field>
-            <Field label="用户名">
+            <Field label={tr("用户名", "User name")}>
               <input required value={identity.username} onChange={(event) => setIdentity({ ...identity, username: event.target.value })} />
             </Field>
           </div>
           <div className="ssh-field-row">
-            <Field label="密码" hint={identity.id ? "留空则不修改。" : undefined}>
+            <Field label={tr("密码", "Password")} hint={identity.id ? tr("留空则不修改。", "Leave empty to keep it.") : undefined}>
               <input type="password" autoComplete="new-password" value={identity.password} onChange={(event) => setIdentity({ ...identity, password: event.target.value })} />
             </Field>
-            <Field label="密钥">
+            <Field label={tr("密钥", "Key")}>
               <Select
-                ariaLabel="密钥"
+                ariaLabel={tr("密钥", "Key")}
                 value={identity.keyId}
                 onChange={(keyId) => setIdentity({ ...identity, keyId })}
-                options={[{ value: "", label: "不用密钥" }, ...state.keys.map((key) => ({ value: key.id, label: key.label, hint: key.type }))]}
+                options={[{ value: "", label: tr("不用密钥", "No key") }, ...state.keys.map((key) => ({ value: key.id, label: key.label, hint: key.type }))]}
               />
             </Field>
           </div>
           <div className="ssh-form-actions">
             <button type="button" className="quiet-button" onClick={reset}>
-              取消
+              {tr("取消", "Cancel")}
             </button>
             <button type="submit" className="quiet-button is-primary" disabled={busy}>
-              保存
+              {tr("保存", "Save")}
             </button>
           </div>
         </form>
       )}
       {state.identities.length === 0 ? (
-        <p className="blank">还没有身份。</p>
+        <p className="blank">{tr("还没有身份。", "No identities yet.")}</p>
       ) : (
         <ul className="ssh-list">
           {state.identities.map((item) => (
@@ -1214,8 +1226,8 @@ function KeychainSection({ state, onChange, onError }: { state: SshState; onChan
                 <strong>{item.label}</strong>
                 <span>
                   {item.username}
-                  {item.hasPassword ? " · 已存密码" : ""}
-                  {item.keyId ? ` · 密钥 ${state.keys.find((key) => key.id === item.keyId)?.label ?? ""}` : ""}
+                  {item.hasPassword ? tr(" · 已存密码", " · password saved") : ""}
+                  {item.keyId ? tr(` · 密钥 ${state.keys.find((key) => key.id === item.keyId)?.label ?? ""}`, ` · key ${state.keys.find((key) => key.id === item.keyId)?.label ?? ""}`) : ""}
                 </span>
               </span>
               <span className="ssh-row-actions">
@@ -1227,10 +1239,10 @@ function KeychainSection({ state, onChange, onError }: { state: SshState; onChan
                     setMode("identity");
                   }}
                 >
-                  编辑
+                  {tr("编辑", "Edit")}
                 </button>
-                <button type="button" className="quiet-button is-danger" onClick={() => window.confirm(`删除身份“${item.label}”？`) && void run(() => ssh.deleteIdentity(item.id))}>
-                  删除
+                <button type="button" className="quiet-button is-danger" onClick={() => window.confirm(tr(`删除身份“${item.label}”？`, `Delete the identity "${item.label}"?`)) && void run(() => ssh.deleteIdentity(item.id))}>
+                  {tr("删除", "Delete")}
                 </button>
               </span>
             </li>
@@ -1243,24 +1255,24 @@ function KeychainSection({ state, onChange, onError }: { state: SshState; onChan
 
 type ScriptKind = NonNullable<SshSnippet["kind"]>;
 const KIND_LABEL: Record<ScriptKind, string> = { linux: "Linux", windows: "Windows", python: "Python" };
-const KIND_HINT: Record<ScriptKind, string> = {
-  linux: "bash 命令",
-  windows: "PowerShell 命令（Windows 主机）",
-  python: "Python 代码，用 python3 在 Linux 上执行",
-};
+const KIND_HINT = (): Record<ScriptKind, string> => ({
+  linux: tr("bash 命令", "bash commands"),
+  windows: tr("PowerShell 命令（Windows 主机）", "PowerShell commands (Windows hosts)"),
+  python: tr("Python 代码，用 python3 在 Linux 上执行", "Python code, run with python3 on Linux"),
+});
 const KIND_MARK: Record<ScriptKind, string> = { linux: "$", windows: "PS", python: "py" };
-const KIND_OPTIONS: SelectOption[] = (Object.keys(KIND_LABEL) as ScriptKind[]).map((kind) => ({
+const KIND_OPTIONS = (): SelectOption[] => (Object.keys(KIND_LABEL) as ScriptKind[]).map((kind) => ({
   value: kind,
   label: KIND_LABEL[kind],
-  hint: KIND_HINT[kind],
+  hint: KIND_HINT()[kind],
   icon: <span className={`mm-kind-mark is-${kind}`}>{KIND_MARK[kind]}</span>,
 }));
 const LAST_MODEL_KEY = "mirrormix.snippet-model";
-const EXAMPLE: Record<ScriptKind, string> = {
-  linux: "如：拉取最新代码，进入 deploy 目录执行 install.sh，最后重启 nginx",
-  windows: "如：查看 C 盘剩余空间，列出占用最大的 10 个文件夹",
-  python: "如：读取 /var/log/nginx/access.log，统计访问次数最多的 10 个 IP",
-};
+const EXAMPLE = (): Record<ScriptKind, string> => ({
+  linux: tr("如：拉取最新代码，进入 deploy 目录执行 install.sh，最后重启 nginx", "e.g. pull the latest code, run install.sh in the deploy folder, then restart nginx"),
+  windows: tr("如：查看 C 盘剩余空间，列出占用最大的 10 个文件夹", "e.g. check free space on C: and list the 10 largest folders"),
+  python: tr("如：读取 /var/log/nginx/access.log，统计访问次数最多的 10 个 IP", "e.g. read /var/log/nginx/access.log and count the 10 most frequent IPs"),
+});
 
 interface ChatLine {
   id: number;
@@ -1319,11 +1331,11 @@ function AiChat({ kind, command, onWritten }: { kind: ScriptKind; command: strin
       if (result.ok) {
         onWritten(result);
         const count = lineCount(result.command);
-        say("ai", `${revising ? "已按要求改好" : "写好了"}：${count} 行${KIND_LABEL[kind]}命令，已填到下面。检查一下再保存，想调整就接着说。`);
+        say("ai", tr(`${revising ? "已按要求改好" : "写好了"}：${count} 行${KIND_LABEL[kind]}命令，已填到下面。检查一下再保存，想调整就接着说。`, `${revising ? "Revised as asked" : "Done"}: ${count} lines of ${KIND_LABEL[kind]} commands, filled in below. Check them before saving; say more to adjust.`));
       } else say("ai", result.message, true);
     } catch (error) {
       const code = (error as { code?: string }).code;
-      say("ai", code === "not_found" ? "这个模型已经不在了，到 设置 → 模型管理 看看。" : "请求没有发出去，稍后再试。", true);
+      say("ai", code === "not_found" ? tr("这个模型已经不在了，到 设置 → 模型管理 看看。", "That model is gone; check Settings → Models.") : tr("请求没有发出去，稍后再试。", "The request was not sent; try again later."), true);
     } finally {
       setWriting(false);
     }
@@ -1332,7 +1344,7 @@ function AiChat({ kind, command, onWritten }: { kind: ScriptKind; command: strin
   if (models !== null && models.length === 0) {
     return (
       <div className="ssh-ai-chat">
-        <p className="ssh-ai-empty">还没有可用的模型。到 设置 → 模型管理 添加一个（如 DeepSeek），就能在这里让它写命令。</p>
+        <p className="ssh-ai-empty">{tr("还没有可用的模型。到 设置 → 模型管理 添加一个（如 DeepSeek），就能在这里让它写命令。", "No models available yet. Add one (such as DeepSeek) in Settings → Models to have it write commands here.")}</p>
       </div>
     );
   }
@@ -1340,18 +1352,20 @@ function AiChat({ kind, command, onWritten }: { kind: ScriptKind; command: strin
     <div className="ssh-ai-chat">
       <div className="ssh-ai-chat-head">
         <span>
-          按 <strong>{KIND_LABEL[kind]}</strong> 脚本来写
+          {tr("按 ", "Writing a ")}
+          <strong>{KIND_LABEL[kind]}</strong>
+          {tr(" 脚本来写", " script")}
         </span>
         {models === null ? (
-          <span className="ssh-field-hint">正在读取模型…</span>
+          <span className="ssh-field-hint">{tr("正在读取模型…", "Loading models…")}</span>
         ) : (
           <span className="ssh-ai-chat-model">
-            <Select ariaLabel="模型" value={model?.id ?? ""} onChange={setModelId} options={models.map((item) => ({ value: item.id, label: item.name, hint: item.model }))} />
+            <Select ariaLabel={tr("模型", "Model")} value={model?.id ?? ""} onChange={setModelId} options={models.map((item) => ({ value: item.id, label: item.name, hint: item.model }))} />
           </span>
         )}
       </div>
       <div className="ssh-ai-log" ref={log} aria-live="polite">
-        {lines.length === 0 && <p className="ssh-ai-intro">{command.trim() ? "说说要怎么改下面的命令，比如“出错时发通知”。" : "描述要做什么，模型写好后直接填到下面。"}</p>}
+        {lines.length === 0 && <p className="ssh-ai-intro">{command.trim() ? tr("说说要怎么改下面的命令，比如“出错时发通知”。", "Say how to change the command below, e.g. \"send a notice on error\".") : tr("描述要做什么，模型写好后直接填到下面。", "Describe what to do; the model fills it in below.")}</p>}
         {lines.map((line) => (
           <p key={line.id} className={`ssh-ai-line is-${line.who}${line.bad ? " is-bad" : ""}`}>
             {line.text}
@@ -1360,7 +1374,7 @@ function AiChat({ kind, command, onWritten }: { kind: ScriptKind; command: strin
         {writing && (
           <p className="ssh-ai-line is-ai is-writing">
             <Spinner />
-            {model?.name ?? "模型"} 正在写…
+            {tr(`${model?.name ?? tr("模型", "Model")} 正在写…`, `${model?.name ?? "The model"} is writing…`)}
           </p>
         )}
       </div>
@@ -1369,7 +1383,7 @@ function AiChat({ kind, command, onWritten }: { kind: ScriptKind; command: strin
           rows={2}
           value={ask}
           autoFocus
-          placeholder={command.trim() ? "要怎么改？Enter 发送，Shift+Enter 换行" : `${EXAMPLE[kind]}。Enter 发送`}
+          placeholder={command.trim() ? tr("要怎么改？Enter 发送，Shift+Enter 换行", "What should change? Enter sends, Shift+Enter starts a new line") : tr(`${EXAMPLE()[kind]}。Enter 发送`, `${EXAMPLE()[kind]}. Enter sends`)}
           onChange={(event) => setAsk(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
@@ -1380,7 +1394,7 @@ function AiChat({ kind, command, onWritten }: { kind: ScriptKind; command: strin
         />
         <button type="button" className="quiet-button is-primary" disabled={writing || !model || !ask.trim()} onClick={() => void send()}>
           {writing ? <Spinner /> : null}
-          发送
+          {tr("发送", "Send")}
         </button>
       </div>
     </div>
@@ -1441,30 +1455,30 @@ function SnippetDrawer({
         }}
       >
         <header className="ssh-editor-head">
-          <h3 id="ssh-snippet-title">{snippet.id ? "编辑片段" : "新建片段"}</h3>
-          <button type="button" className="icon-button" aria-label="关闭" onClick={onClose}>
+          <h3 id="ssh-snippet-title">{snippet.id ? tr("编辑片段", "Edit snippet") : tr("新建片段", "New snippet")}</h3>
+          <button type="button" className="icon-button" aria-label={tr("关闭", "Close")} onClick={onClose}>
             <CloseIcon />
           </button>
         </header>
         <div className="ssh-editor-body">
-          <Field label="名称">
-            <input autoFocus value={form.label ?? ""} placeholder="不填就用命令的第一行" onChange={(event) => setForm({ ...form, label: event.target.value })} />
+          <Field label={tr("名称", "Name")}>
+            <input autoFocus value={form.label ?? ""} placeholder={tr("不填就用命令的第一行", "Defaults to the command's first line")} onChange={(event) => setForm({ ...form, label: event.target.value })} />
           </Field>
           <div className="ssh-field">
-            <span className="ssh-field-label">脚本类型</span>
-            <Select ariaLabel="脚本类型" value={kind} options={KIND_OPTIONS} onChange={(next) => setForm({ ...form, kind: next as ScriptKind })} />
+            <span className="ssh-field-label">{tr("脚本类型", "Script type")}</span>
+            <Select ariaLabel={tr("脚本类型", "Script type")} value={kind} options={KIND_OPTIONS()} onChange={(next) => setForm({ ...form, kind: next as ScriptKind })} />
           </div>
           <div className="ssh-field ssh-command-field">
             <div className="ssh-command-head">
               <label className="ssh-field-label" htmlFor="ssh-snippet-command">
-                命令
+                {tr("命令", "Command")}
               </label>
               <button
                 type="button"
                 className={chat ? "ssh-ai-toggle is-on" : "ssh-ai-toggle"}
                 aria-expanded={chat}
-                aria-label={chat ? "收起 AI 生成" : "AI 生成"}
-                title={chat ? "收起 AI 生成" : "AI 生成"}
+                aria-label={chat ? tr("收起 AI 生成", "Hide AI writing") : tr("AI 生成", "Write with AI")}
+                title={chat ? tr("收起 AI 生成", "Hide AI writing") : tr("AI 生成", "Write with AI")}
                 onClick={() => {
                   setOpened(true);
                   setChat(!chat);
@@ -1475,7 +1489,7 @@ function SnippetDrawer({
                     <path d="M8 1.5 9.4 6.6 14.5 8 9.4 9.4 8 14.5 6.6 9.4 1.5 8 6.6 6.6Z" fill="currentColor" />
                   </svg>
                 </span>
-                AI 生成
+                {tr("AI 生成", "Write with AI")}
               </button>
             </div>
             {/* Folding the chat away keeps what was said, for when it opens again. */}
@@ -1495,9 +1509,9 @@ function SnippetDrawer({
           </div>
           <div className="ssh-field">
             <label className="ssh-field-label" htmlFor="ssh-snippet-tags">
-              标签（可不填）
+              {tr("标签（可不填）", "Tags (optional)")}
             </label>
-            <input id="ssh-snippet-tags" className="ssh-text-input" value={tags} placeholder="部署, 日志, 数据库" onChange={(event) => setTags(event.target.value)} />
+            <input id="ssh-snippet-tags" className="ssh-text-input" value={tags} placeholder={tr("部署, 日志, 数据库", "deploy, logs, database")} onChange={(event) => setTags(event.target.value)} />
             {suggested.length > 0 && (
               <span className="ssh-tag-suggest">
                 {suggested.map((tag) => (
@@ -1509,17 +1523,17 @@ function SnippetDrawer({
             )}
           </div>
           <label className="ssh-check">
-            <input type="checkbox" checked={form.run !== false} onChange={(event) => setForm({ ...form, run: event.target.checked })} /> 输入后直接回车执行
+            <input type="checkbox" checked={form.run !== false} onChange={(event) => setForm({ ...form, run: event.target.checked })} /> {tr("输入后直接回车执行", "Press Enter after typing it")}
           </label>
         </div>
         <footer className="ssh-editor-foot">
           <button type="button" className="quiet-button" onClick={onClose}>
-            取消
+            {tr("取消", "Cancel")}
           </button>
           <span className="ssh-editor-spacer" />
           <button type="submit" className="quiet-button is-primary" disabled={busy || !command.trim()}>
             {busy && <Spinner />}
-            保存片段
+            {tr("保存片段", "Save snippet")}
           </button>
         </footer>
       </form>
@@ -1529,19 +1543,19 @@ function SnippetDrawer({
 
 /** When something was last changed, in words: 刚刚, 5 分钟前, 昨天 14:20, 2026-11-02. */
 function updatedText(ms?: number): string {
-  if (!ms) return "更新时间未知";
+  if (!ms) return tr("更新时间未知", "Update time unknown");
   const now = new Date();
   const at = new Date(ms);
   const minutes = Math.floor((now.getTime() - ms) / 60_000);
-  if (minutes < 1) return "刚刚更新";
-  if (minutes < 60) return `${minutes} 分钟前更新`;
-  const clock = at.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
+  if (minutes < 1) return tr("刚刚更新", "Updated just now");
+  if (minutes < 60) return tr(`${minutes} 分钟前更新`, `Updated ${minutes} min ago`);
+  const clock = at.toLocaleTimeString(uiLocale(), { hour: "2-digit", minute: "2-digit", hour12: false });
   const day = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
   const days = Math.round((day(now) - day(at)) / 86_400_000);
-  if (days === 0) return `今天 ${clock} 更新`;
-  if (days === 1) return `昨天 ${clock} 更新`;
+  if (days === 0) return tr(`今天 ${clock} 更新`, `Updated today ${clock}`);
+  if (days === 1) return tr(`昨天 ${clock} 更新`, `Updated yesterday ${clock}`);
   const date = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, "0")}-${String(at.getDate()).padStart(2, "0")}`;
-  return `${date} 更新`;
+  return tr(`${date} 更新`, `Updated ${date}`);
 }
 
 const snippetMark = (snippet: Pick<SshSnippet, "kind">) =>
@@ -1563,11 +1577,13 @@ function SnippetView({ snippet, onClose, onEdit, onDelete }: { snippet: SshSnipp
           <div className="ssh-snippet-view-title">
             <h3 id="ssh-snippet-view-title">{snippet.label}</h3>
             <span>
-              {snippet.kind ? `${KIND_LABEL[snippet.kind]} 脚本` : "未注明类型"}，{updatedText(snippet.updatedAt)}
-              {snippet.run ? "" : "，输入后不自动回车"}
+              {snippet.kind ? tr(`${KIND_LABEL[snippet.kind]} 脚本`, `${KIND_LABEL[snippet.kind]} script`) : tr("未注明类型", "No type given")}
+              {tr("，", ", ")}
+              {updatedText(snippet.updatedAt)}
+              {snippet.run ? "" : tr("，输入后不自动回车", ", typed without pressing Enter")}
             </span>
           </div>
-          <button type="button" className="icon-button" aria-label="关闭" onClick={onClose}>
+          <button type="button" className="icon-button" aria-label={tr("关闭", "Close")} onClick={onClose}>
             <CloseIcon />
           </button>
         </div>
@@ -1589,20 +1605,20 @@ function SnippetView({ snippet, onClose, onEdit, onDelete }: { snippet: SshSnipp
               window.setTimeout(() => setCopied(false), 1500);
             }}
           >
-            {copied ? "已复制" : "复制"}
+            {copied ? tr("已复制", "Copied") : tr("复制", "Copy")}
           </button>
         </div>
         <div className="ssh-modal-actions">
           <button type="button" className="quiet-button is-delete" onClick={onDelete}>
-            删除
+            {tr("删除", "Delete")}
           </button>
           <span className="ssh-editor-spacer" />
           <button type="button" className="quiet-button" onClick={onClose}>
-            关闭
+            {tr("关闭", "Close")}
           </button>
           <button type="button" className="quiet-button is-primary" onClick={onEdit}>
             <EditIcon />
-            编辑
+            {tr("编辑", "Edit")}
           </button>
         </div>
       </div>
@@ -1654,8 +1670,8 @@ function SnippetDeleteDialog({ snippet, users, onCancel, onDeleted }: { snippet:
             <TrashIcon />
           </span>
           <div>
-            <h3 id="ssh-snippet-delete-title">删除这个代码片段？</h3>
-            <p id="ssh-snippet-delete-note">{blocked ? "还有任务在用它，先把这些任务换成别的片段或删掉。" : "删除后无法恢复。"}</p>
+            <h3 id="ssh-snippet-delete-title">{tr("删除这个代码片段？", "Delete this snippet?")}</h3>
+            <p id="ssh-snippet-delete-note">{blocked ? tr("还有任务在用它，先把这些任务换成别的片段或删掉。", "Tasks still use it. Switch them to another snippet or delete them first.") : tr("删除后无法恢复。", "This cannot be undone.")}</p>
           </div>
         </div>
         <div className="ssh-confirm-item">
@@ -1665,11 +1681,11 @@ function SnippetDeleteDialog({ snippet, users, onCancel, onDeleted }: { snippet:
           </span>
           <pre>
             {preview}
-            {lines.length > 4 && <span className="ssh-confirm-more">{`\n… 还有 ${lines.length - 4} 行`}</span>}
+            {lines.length > 4 && <span className="ssh-confirm-more">{tr(`\n… 还有 ${lines.length - 4} 行`, `\n… ${lines.length - 4} more lines`)}</span>}
           </pre>
         </div>
         {blocked && (
-          <ul className="ssh-confirm-users" aria-label="在用这个片段的任务">
+          <ul className="ssh-confirm-users" aria-label={tr("在用这个片段的任务", "Tasks using this snippet")}>
             {users.map((task) => (
               <li key={task.id}>{task.name}</li>
             ))}
@@ -1682,12 +1698,12 @@ function SnippetDeleteDialog({ snippet, users, onCancel, onDeleted }: { snippet:
         )}
         <div className="ssh-modal-actions">
           <button type="button" className="quiet-button" ref={cancel} onClick={onCancel} disabled={busy}>
-            {blocked ? "知道了" : "取消"}
+            {blocked ? tr("知道了", "OK") : tr("取消", "Cancel")}
           </button>
           {!blocked && (
             <button type="button" className="quiet-button is-danger" onClick={() => void confirm()} disabled={busy}>
               {busy ? <Spinner /> : <TrashIcon />}
-              {busy ? "正在删除" : "删除"}
+              {busy ? tr("正在删除", "Deleting") : tr("删除", "Delete")}
             </button>
           )}
         </div>
@@ -1725,18 +1741,18 @@ function SnippetsSection({ state, onChange, onError }: { state: SshState; onChan
       <div className="ssh-toolbar">
         <label className="ssh-search">
           <SearchIcon />
-          <input placeholder="搜索片段名称、命令或标签" value={query} onChange={(event) => setQuery(event.target.value)} />
+          <input placeholder={tr("搜索片段名称、命令或标签", "Search snippet names, commands or tags")} value={query} onChange={(event) => setQuery(event.target.value)} />
         </label>
         <button type="button" className="quiet-button is-primary" onClick={() => setForm({ label: "", command: "", run: true, kind: "linux", tags: [] })}>
           <PlusIcon />
-          新建片段
+          {tr("新建片段", "New snippet")}
         </button>
       </div>
 
       {allTags.length > 0 && (
-        <div className="ssh-tag-filter" role="group" aria-label="按标签筛选">
+        <div className="ssh-tag-filter" role="group" aria-label={tr("按标签筛选", "Filter by tag")}>
           <button type="button" className={picked ? "ssh-tag-chip" : "ssh-tag-chip is-on"} aria-pressed={!picked} onClick={() => setTag(null)}>
-            全部
+            {tr("全部", "All")}
             <span>{state.snippets.length}</span>
           </button>
           {allTags.map((item) => (
@@ -1792,12 +1808,12 @@ function SnippetsSection({ state, onChange, onError }: { state: SshState; onChan
       )}
 
       {shown.length === 0 ? (
-        <p className="blank">{state.snippets.length ? "没有匹配的片段。" : "还没有代码片段。点“新建片段”写一个，或让 AI 帮你写。"}</p>
+        <p className="blank">{state.snippets.length ? tr("没有匹配的片段。", "No matching snippets.") : tr("还没有代码片段。点“新建片段”写一个，或让 AI 帮你写。", "No snippets yet. Click New snippet to write one, or let AI write it.")}</p>
       ) : (
         <ul className="ssh-snippet-cards">
           {shown.map((snippet) => (
             <li key={snippet.id}>
-              <button type="button" className="ssh-snippet-card" onClick={() => setViewing(snippet.id)} aria-label={`${snippet.label}，查看命令`}>
+              <button type="button" className="ssh-snippet-card" onClick={() => setViewing(snippet.id)} aria-label={tr(`${snippet.label}，查看命令`, `${snippet.label}, view the command`)}>
                 <span className="ssh-snippet-card-top">
                   {snippetMark(snippet)}
                   <strong>{snippet.label}</strong>
@@ -1809,16 +1825,16 @@ function SnippetsSection({ state, onChange, onError }: { state: SshState; onChan
                     ))}
                   </span>
                 ) : (
-                  <span className="ssh-snippet-card-none">没有标签</span>
+                  <span className="ssh-snippet-card-none">{tr("没有标签", "No tags")}</span>
                 )}
                 <span className="ssh-snippet-card-when">{updatedText(snippet.updatedAt)}</span>
               </button>
               {/* Beside the card, not inside it: a button cannot hold buttons. Shown on hover or keyboard focus. */}
               <span className="ssh-snippet-card-tools">
-                <button type="button" className="icon-button" aria-label={`编辑 ${snippet.label}`} title="编辑" onClick={() => setForm(snippet)}>
+                <button type="button" className="icon-button" aria-label={tr(`编辑 ${snippet.label}`, `Edit ${snippet.label}`)} title={tr("编辑", "Edit")} onClick={() => setForm(snippet)}>
                   <EditIcon />
                 </button>
-                <button type="button" className="icon-button is-delete" aria-label={`删除 ${snippet.label}`} title="删除" onClick={() => remove(snippet)}>
+                <button type="button" className="icon-button is-delete" aria-label={tr(`删除 ${snippet.label}`, `Delete ${snippet.label}`)} title={tr("删除", "Delete")} onClick={() => remove(snippet)}>
                   <TrashIcon />
                 </button>
               </span>
@@ -1832,12 +1848,12 @@ function SnippetsSection({ state, onChange, onError }: { state: SshState; onChan
 
 // ---------------------------------------------------------------- tasks
 
-const RUN_WORD: Record<SshTaskRun["state"], string> = { running: "执行中", ok: "成功", failed: "失败", stopped: "已停止" };
+const RUN_WORD = (): Record<SshTaskRun["state"], string> => ({ running: tr("执行中", "Running"), ok: tr("成功", "Succeeded"), failed: tr("失败", "Failed"), stopped: tr("已停止", "Stopped") });
 
 function took(run: SshTaskRun, now: number) {
   const ms = (run.endedAt ?? now) - run.startedAt;
   const seconds = Math.max(0, Math.round(ms / 1000));
-  return seconds < 60 ? `${seconds} 秒` : `${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`;
+  return seconds < 60 ? tr(`${seconds} 秒`, `${seconds} s`) : tr(`${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`, `${Math.floor(seconds / 60)} min ${seconds % 60} s`);
 }
 
 /** The result of a run in a few words: state, exit code, how long. */
@@ -1845,8 +1861,8 @@ function RunBadge({ run, now }: { run: SshTaskRun; now: number }) {
   return (
     <span className={`ssh-run-badge is-${run.state}`}>
       {run.state === "running" && <Spinner />}
-      {RUN_WORD[run.state]}
-      {run.exitCode !== undefined && run.state !== "ok" && <em>退出码 {run.exitCode}</em>}
+      {RUN_WORD()[run.state]}
+      {run.exitCode !== undefined && run.state !== "ok" && <em>{tr(`退出码 ${run.exitCode}`, `exit code ${run.exitCode}`)}</em>}
       <em>{took(run, now)}</em>
     </span>
   );
@@ -1883,12 +1899,12 @@ function RunOutput({ runId, onError }: { runId: string; onError: (text: string) 
     const element = box.current;
     if (element && stuck.current) element.scrollTop = element.scrollHeight;
   }, [run?.output]);
-  if (!run) return <p className="blank">正在读取输出…</p>;
+  if (!run) return <p className="blank">{tr("正在读取输出…", "Loading output…")}</p>;
   return (
     <div className="ssh-run">
       <div className="ssh-run-head">
         <RunBadge run={run} now={now} />
-        <span className="ssh-run-when">{when(run.startedAt)} 开始</span>
+        <span className="ssh-run-when">{tr(`${when(run.startedAt)} 开始`, `Started ${when(run.startedAt)}`)}</span>
         {run.state === "running" && (
           <button
             type="button"
@@ -1902,7 +1918,7 @@ function RunOutput({ runId, onError }: { runId: string; onError: (text: string) 
             }}
           >
             <StopIcon />
-            停止
+            {tr("停止", "Stop")}
           </button>
         )}
       </div>
@@ -1915,8 +1931,8 @@ function RunOutput({ runId, onError }: { runId: string; onError: (text: string) 
           stuck.current = element.scrollHeight - element.scrollTop - element.clientHeight < 24;
         }}
       >
-        {run.truncated && <span className="ssh-run-cut">…前面的输出太长，已省略{"\n"}</span>}
-        {run.output || (run.state === "running" ? "等待输出…" : "（没有输出）")}
+        {run.truncated && <span className="ssh-run-cut">{tr("…前面的输出太长，已省略", "…earlier output was too long and is left out")}{"\n"}</span>}
+        {run.output || (run.state === "running" ? tr("等待输出…", "Waiting for output…") : tr("（没有输出）", "(no output)"))}
       </pre>
     </div>
   );
@@ -1948,11 +1964,11 @@ function HostPicker({ hosts, groups, value, onChange }: { hosts: SshHostView[]; 
         hint: hostAddress(host),
         icon: <Avatar host={host} />,
         keywords: [host.host, host.username, ...host.tags].join(" "),
-        group: nameOf(host) || (groups.length ? "未分组" : undefined),
+        group: nameOf(host) || (groups.length ? tr("未分组", "Ungrouped") : undefined),
         side: <TagList tags={host.tags} />,
       }));
   }, [hosts, groups]);
-  return <Select rich ariaLabel="主机" placeholder="选择主机" searchHint="名称、地址、分组或标签" empty="还没有主机" value={value} onChange={onChange} options={options} />;
+  return <Select rich ariaLabel={tr("主机", "Host")} placeholder={tr("选择主机", "Choose a host")} searchHint={tr("名称、地址、分组或标签", "Name, address, group or tag")} empty={tr("还没有主机", "No hosts yet")} value={value} onChange={onChange} options={options} />;
 }
 
 /** How many lines a snippet has. */
@@ -1969,7 +1985,7 @@ function snippetOption(snippet: SshSnippet): SelectOption {
     keywords: [snippet.command, ...snippet.tags].join(" "),
     side: (
       <>
-        {lines > 1 && <span>{lines} 行</span>}
+        {lines > 1 && <span>{tr(`${lines} 行`, `${lines} lines`)}</span>}
         <TagList tags={snippet.tags} />
       </>
     ),
@@ -1978,7 +1994,7 @@ function snippetOption(snippet: SshSnippet): SelectOption {
 
 function SnippetPicker({ snippets, value, onChange }: { snippets: SshSnippet[]; value: string; onChange: (id: string) => void }) {
   const options = useMemo(() => snippets.map(snippetOption), [snippets]);
-  return <Select rich ariaLabel="代码片段" placeholder="选择代码片段" searchHint="片段名称、命令或标签" empty="还没有代码片段" value={value} onChange={onChange} options={options} />;
+  return <Select rich ariaLabel={tr("代码片段", "Snippet")} placeholder={tr("选择代码片段", "Choose a snippet")} searchHint={tr("片段名称、命令或标签", "Snippet name, command or tag")} empty={tr("还没有代码片段", "No snippets yet")} value={value} onChange={onChange} options={options} />;
 }
 
 const splitTags = (text: string) => [...new Set(text.split(/[,，\s]+/).map((tag) => tag.trim()).filter(Boolean))];
@@ -2033,37 +2049,37 @@ function TaskDialog({
         }}
       >
         <div className="ssh-task-dialog-head">
-          <h3 id="ssh-task-title">{task.id ? "编辑任务" : "新建任务"}</h3>
-          <button type="button" className="icon-button" aria-label="关闭" onClick={onClose}>
+          <h3 id="ssh-task-title">{task.id ? tr("编辑任务", "Edit task") : tr("新建任务", "New task")}</h3>
+          <button type="button" className="icon-button" aria-label={tr("关闭", "Close")} onClick={onClose}>
             <CloseIcon />
           </button>
         </div>
-        <Field label="任务名称">
-          <input autoFocus value={form.name ?? ""} placeholder={snippet && host ? `${snippet.label} @ ${host.label}` : "如：部署 DNSMgr"} onChange={(event) => setForm({ ...form, name: event.target.value })} />
+        <Field label={tr("任务名称", "Task name")}>
+          <input autoFocus value={form.name ?? ""} placeholder={snippet && host ? `${snippet.label} @ ${host.label}` : tr("如：部署 DNSMgr", "e.g. Deploy DNSMgr")} onChange={(event) => setForm({ ...form, name: event.target.value })} />
         </Field>
         <div className="ssh-field">
-          <span className="ssh-field-label">主机</span>
+          <span className="ssh-field-label">{tr("主机", "Host")}</span>
           <HostPicker hosts={state.hosts} groups={state.groups} value={form.hostId ?? ""} onChange={(hostId) => setForm({ ...form, hostId })} />
         </div>
-        <Field label="目录">
-          <input className="ssh-mono" value={form.dir ?? ""} placeholder="/opt/code/my-app，不填就在登录后的默认目录" onChange={(event) => setForm({ ...form, dir: event.target.value })} />
+        <Field label={tr("目录", "Folder")}>
+          <input className="ssh-mono" value={form.dir ?? ""} placeholder={tr("/opt/code/my-app，不填就在登录后的默认目录", "/opt/code/my-app; empty uses the default folder after signing in")} onChange={(event) => setForm({ ...form, dir: event.target.value })} />
         </Field>
         <div className="ssh-field">
-          <span className="ssh-field-label">代码片段</span>
+          <span className="ssh-field-label">{tr("代码片段", "Snippet")}</span>
           <SnippetPicker snippets={state.snippets} value={form.snippetId ?? ""} onChange={(snippetId) => setForm({ ...form, snippetId })} />
         </div>
         {snippet && (
           <div className="ssh-field">
-            <span className="ssh-field-label">执行时</span>
+            <span className="ssh-field-label">{tr("执行时", "When run")}</span>
             <pre className="ssh-task-preview">{`${form.dir ? `${snippet.kind === "windows" ? "Set-Location" : "cd"} ${form.dir}\n` : ""}${snippet.command.replace(/\n+$/, "")}`}</pre>
-            <span className="ssh-field-hint">{form.dir ? "先进入这个目录，进不去就停止；片段里的相对路径都从这里算。" : "没填目录：在登录后的默认目录执行。"}</span>
+            <span className="ssh-field-hint">{form.dir ? tr("先进入这个目录，进不去就停止；片段里的相对路径都从这里算。", "Enters this folder first and stops if it cannot; relative paths in the snippet start here.") : tr("没填目录：在登录后的默认目录执行。", "No folder: runs in the default folder after signing in.")}</span>
           </div>
         )}
         <div className="ssh-field">
           <label className="ssh-field-label" htmlFor="ssh-task-tags">
-            标签（可不填）
+            {tr("标签（可不填）", "Tags (optional)")}
           </label>
-          <input id="ssh-task-tags" value={tags} placeholder="部署, 生产" onChange={(event) => setTags(event.target.value)} />
+          <input id="ssh-task-tags" value={tags} placeholder={tr("部署, 生产", "deploy, production")} onChange={(event) => setTags(event.target.value)} />
           {known.length > 0 && (
             <span className="ssh-tag-suggest">
               {known.map((tag) => (
@@ -2076,11 +2092,11 @@ function TaskDialog({
         </div>
         <div className="ssh-modal-actions">
           <button type="button" className="quiet-button" onClick={onClose}>
-            取消
+            {tr("取消", "Cancel")}
           </button>
           <button type="submit" className="quiet-button is-primary" disabled={busy || !form.hostId || !form.snippetId}>
             {busy && <Spinner />}
-            保存任务
+            {tr("保存任务", "Save task")}
           </button>
         </div>
       </form>
@@ -2131,7 +2147,7 @@ function TasksSection({
     } catch (error) {
       const fail = error as Fail;
       if (fail.question) onHostKey(fail.question, () => void run(task));
-      else onError(`${task.name}：${explain(error)}`);
+      else onError(tr(`${task.name}：${explain(error)}`, `${task.name}: ${explain(error)}`));
     } finally {
       setStarting("");
     }
@@ -2142,11 +2158,11 @@ function TasksSection({
   // A tag no task carries any more stops filtering.
   const picked = tag && allTags.includes(tag) ? tag : null;
   const shown = state.tasks.filter((task) => !picked || tagsOf(task).includes(picked));
-  const missing = !state.hosts.length ? "先在“主机”里添加一台主机。" : !state.snippets.length ? "先在“代码片段”里写好要执行的命令。" : "";
+  const missing = !state.hosts.length ? tr("先在“主机”里添加一台主机。", "Add a host under Hosts first.") : !state.snippets.length ? tr("先在“代码片段”里写好要执行的命令。", "Write the command to run under Snippets first.") : "";
   const newTask = (
     <button type="button" className="quiet-button is-primary ssh-new-task" disabled={Boolean(missing)} onClick={() => setForm({})}>
       <PlusIcon />
-      新建任务
+      {tr("新建任务", "New task")}
     </button>
   );
 
@@ -2160,7 +2176,7 @@ function TasksSection({
               {missing}
               {!!state.hosts.length && (
                 <button type="button" className="link-button" onClick={onSnippets}>
-                  去写代码片段
+                  {tr("去写代码片段", "Write a snippet")}
                 </button>
               )}
             </p>
@@ -2173,9 +2189,9 @@ function TasksSection({
       {headerSlot && createPortal(newTask, headerSlot)}
 
       {allTags.length > 0 && (
-        <div className="ssh-tag-filter" role="group" aria-label="按标签筛选">
+        <div className="ssh-tag-filter" role="group" aria-label={tr("按标签筛选", "Filter by tag")}>
           <button type="button" className={picked ? "ssh-tag-chip" : "ssh-tag-chip is-on"} aria-pressed={!picked} onClick={() => setTag(null)}>
-            全部
+            {tr("全部", "All")}
             <span>{state.tasks.length}</span>
           </button>
           {allTags.map((item) => (
@@ -2207,7 +2223,7 @@ function TasksSection({
         />
       )}
       {shown.length === 0 ? (
-        <p className="blank">{missing ? "" : "还没有任务。"}</p>
+        <p className="blank">{missing ? "" : tr("还没有任务。", "No tasks yet.")}</p>
       ) : (
         <ul className="ssh-tasks">
           {shown.map((task) => {
@@ -2233,10 +2249,10 @@ function TasksSection({
                     <span className="ssh-task-where">
                       <span className={host ? "ssh-task-host" : "ssh-task-host is-gone"}>
                         {host ? <Avatar host={host} /> : null}
-                        {host ? host.label : "主机已删除"}
+                        {host ? host.label : tr("主机已删除", "Host deleted")}
                       </span>
-                      <code title={task.dir || "登录后的默认目录"}>{task.dir || "默认目录"}</code>
-                      {!snippet && <span className="ssh-task-gone">片段已删除</span>}
+                      <code title={task.dir || tr("登录后的默认目录", "The default folder after signing in")}>{task.dir || tr("默认目录", "Default folder")}</code>
+                      {!snippet && <span className="ssh-task-gone">{tr("片段已删除", "Snippet deleted")}</span>}
                     </span>
                   </span>
                   <span className="ssh-task-side">
@@ -2245,14 +2261,14 @@ function TasksSection({
                         type="button"
                         className="ssh-task-last"
                         aria-expanded={isOpen}
-                        title={isOpen ? "收起输出" : "展开输出"}
+                        title={isOpen ? tr("收起输出", "Hide output") : tr("展开输出", "Show output")}
                         onClick={() => setOpen(isOpen ? null : { taskId: task.id, runId: last.id })}
                       >
                         <RunBadge run={last} now={now} />
                         <span className="ssh-task-toggle">
                           {/* ">" turns to point down while the output is open below. */}
                           <ChevronIcon />
-                          {isOpen ? "收起输出" : "展开输出"}
+                          {isOpen ? tr("收起输出", "Hide output") : tr("展开输出", "Show output")}
                         </span>
                       </button>
                     )}
@@ -2260,22 +2276,22 @@ function TasksSection({
                       type="button"
                       className="ssh-task-run"
                       disabled={running || starting === task.id || !host || !snippet}
-                      aria-label={`执行 ${task.name}`}
-                      title={running ? "正在执行" : "执行"}
+                      aria-label={tr(`执行 ${task.name}`, `Run ${task.name}`)}
+                      title={running ? tr("正在执行", "Running") : tr("执行", "Run")}
                       onClick={() => void run(task)}
                     >
                       {running || starting === task.id ? <Spinner /> : <PlayIcon />}
                     </button>
-                    <button type="button" className="icon-button ssh-task-icon" aria-label={`编辑 ${task.name}`} title="编辑" onClick={() => setForm(task)}>
+                    <button type="button" className="icon-button ssh-task-icon" aria-label={tr(`编辑 ${task.name}`, `Edit ${task.name}`)} title={tr("编辑", "Edit")} onClick={() => setForm(task)}>
                       <EditIcon />
                     </button>
                     <button
                       type="button"
                       className="icon-button ssh-task-icon is-delete"
-                      aria-label={`删除 ${task.name}`}
-                      title="删除"
+                      aria-label={tr(`删除 ${task.name}`, `Delete ${task.name}`)}
+                      title={tr("删除", "Delete")}
                       onClick={async () => {
-                        if (!window.confirm(`删除任务“${task.name}”？${running ? "正在执行的这一次会被停止。" : ""}`)) return;
+                        if (!window.confirm(tr(`删除任务“${task.name}”？${running ? "正在执行的这一次会被停止。" : ""}`, `Delete the task "${task.name}"?${running ? " The run in progress will be stopped." : ""}`))) return;
                         try {
                           await ssh.deleteTask(task.id);
                           if (isOpen) setOpen(null);
@@ -2351,7 +2367,7 @@ export function SshPlugin({ mobile = false, headerSlot = null }: { mobile?: bool
     } catch (caught) {
       const fail = caught as Fail;
       if (fail.question) askHostKey(fail.question, () => void connect(host));
-      else showError(`${host.label}：${explain(caught)}`);
+      else showError(tr(`${host.label}：${explain(caught)}`, `${host.label}: ${explain(caught)}`));
     } finally {
       setConnecting("");
     }
@@ -2366,7 +2382,7 @@ export function SshPlugin({ mobile = false, headerSlot = null }: { mobile?: bool
         if (fail.question) {
           return new Promise<boolean>((resolve) => askHostKey(fail.question!, () => void testHost(host).then(resolve)));
         }
-        showError(`${host.label}：${explain(caught)}`);
+        showError(tr(`${host.label}：${explain(caught)}`, `${host.label}: ${explain(caught)}`));
         return false;
       },
     );
@@ -2391,7 +2407,7 @@ export function SshPlugin({ mobile = false, headerSlot = null }: { mobile?: bool
   const currentSftpHost = tab.kind === "sftp" ? hostsById.get(tab.hostId) : undefined;
 
   if (!state) {
-    return <div className="ssh">{error ? <p className="banner is-warning">{error}</p> : <p className="blank">正在读取…</p>}</div>;
+    return <div className="ssh">{error ? <p className="banner is-warning">{error}</p> : <p className="blank">{tr("正在读取…", "Loading…")}</p>}</div>;
   }
 
   return (
@@ -2400,7 +2416,7 @@ export function SshPlugin({ mobile = false, headerSlot = null }: { mobile?: bool
       {(!mobile || state.sessions.length > 0 || sftpHosts.length > 0 || connecting) && (
       <div className="ssh-tabs" role="tablist" aria-label="SSH">
         <button type="button" role="tab" aria-selected={tab.kind === "vault"} className={tab.kind === "vault" ? "ssh-tab active" : "ssh-tab"} onClick={() => setTab({ kind: "vault" })}>
-          主机库
+          {tr("主机库", "Hosts")}
         </button>
         {state.sessions.map((session, index) => {
           const host = hostsById.get(session.hostId);
@@ -2414,7 +2430,7 @@ export function SshPlugin({ mobile = false, headerSlot = null }: { mobile?: bool
                 {session.label}
                 {number}
               </button>
-              <button type="button" className="ssh-tab-close" aria-label={`关闭 ${session.label}`} onClick={() => void closeTerminal(session.tid)}>
+              <button type="button" className="ssh-tab-close" aria-label={tr(`关闭 ${session.label}`, `Close ${session.label}`)} onClick={() => void closeTerminal(session.tid)}>
                 <CloseIcon />
               </button>
             </span>
@@ -2433,7 +2449,7 @@ export function SshPlugin({ mobile = false, headerSlot = null }: { mobile?: bool
               <button
                 type="button"
                 className="ssh-tab-close"
-                aria-label={`关闭 ${host.label} 的 SFTP`}
+                aria-label={tr(`关闭 ${host.label} 的 SFTP`, `Close ${host.label}'s SFTP`)}
                 onClick={() => {
                   setSftpHosts((current) => current.filter((item) => item !== hostId));
                   if (active) setTab({ kind: "vault" });
@@ -2447,7 +2463,7 @@ export function SshPlugin({ mobile = false, headerSlot = null }: { mobile?: bool
         {connecting && (
           <span className="ssh-tab is-pending">
             <Spinner />
-            正在连接 {hostsById.get(connecting)?.label}
+            {tr(`正在连接 ${hostsById.get(connecting)?.label ?? ""}`, `Connecting ${hostsById.get(connecting)?.label ?? ""}`)}
           </span>
         )}
       </div>
@@ -2461,8 +2477,8 @@ export function SshPlugin({ mobile = false, headerSlot = null }: { mobile?: bool
 
       {tab.kind === "vault" && (
         <div className="ssh-vault">
-          <nav className="ssh-nav" aria-label="主机库">
-            {SECTIONS.map(([key, label]) => (
+          <nav className="ssh-nav" aria-label={tr("主机库", "Hosts")}>
+            {SECTIONS().map(([key, label]) => (
               <button key={key} type="button" className={section === key ? "active" : ""} aria-current={section === key ? "page" : undefined} onClick={() => setSection(key)}>
                 {label}
                 <span className="ssh-nav-count">
@@ -2538,7 +2554,7 @@ export function SshPlugin({ mobile = false, headerSlot = null }: { mobile?: bool
                 editing.host
                   ? async () => {
                       const target = editing.host!;
-                      if (!window.confirm(`删除主机“${target.label}”？它的终端、SFTP 和端口转发规则也会一起关闭和删除。`)) return;
+                      if (!window.confirm(tr(`删除主机“${target.label}”？它的终端、SFTP 和端口转发规则也会一起关闭和删除。`, `Delete the host "${target.label}"? Its terminals, SFTP and port forwarding rules are closed and deleted too.`))) return;
                       try {
                         await ssh.deleteHost(target.id);
                         setEditing(null);
@@ -2567,12 +2583,12 @@ export function SshPlugin({ mobile = false, headerSlot = null }: { mobile?: bool
             <span className="ssh-spacer" />
             <span className="ssh-menu-wrap">
               <button type="button" className="quiet-button" aria-expanded={snippetMenu} onClick={() => setSnippetMenu((open) => !open)}>
-                片段
+                {tr("片段", "Snippets")}
               </button>
               {snippetMenu && (
                 <div className="ssh-menu" role="menu">
                   {state.snippets.length === 0 ? (
-                    <p className="blank">还没有片段，到“主机库 → 代码片段”添加。</p>
+                    <p className="blank">{tr("还没有片段，到“主机库 → 代码片段”添加。", "No snippets yet; add them under Hosts → Snippets.")}</p>
                   ) : (
                     state.snippets.map((snippet) => (
                       <button
@@ -2614,7 +2630,7 @@ export function SshPlugin({ mobile = false, headerSlot = null }: { mobile?: bool
                 if (host) void connect(host);
               }}
             >
-              再开一个
+              {tr("再开一个", "Open another")}
             </button>
           </div>
           <SshScreen key={currentSession.tid} tid={currentSession.tid} mobile={mobile} onGone={() => void refresh()} />

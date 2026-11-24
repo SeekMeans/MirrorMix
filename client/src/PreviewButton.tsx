@@ -3,12 +3,13 @@ import { createPortal } from "react-dom";
 import { api, type HtmlFile, type ListeningPort, type PreviewPickView, type PreviewRequest, type ToolId } from "./api";
 import { CloseIcon, GlobeIcon, PlusIcon, Spinner, TrashIcon } from "./icons";
 
+import { tr } from "./i18n";
 function ago(iso: string): string {
   const seconds = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000));
-  if (seconds < 60) return "刚刚";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)} 分钟前`;
-  if (seconds < 86_400) return `${Math.floor(seconds / 3600)} 小时前`;
-  return `${Math.floor(seconds / 86_400)} 天前`;
+  if (seconds < 60) return tr("刚刚", "just now");
+  if (seconds < 3600) return tr(`${Math.floor(seconds / 60)} 分钟前`, `${Math.floor(seconds / 60)} min ago`);
+  if (seconds < 86_400) return tr(`${Math.floor(seconds / 3600)} 小时前`, `${Math.floor(seconds / 3600)} h ago`);
+  return tr(`${Math.floor(seconds / 86_400)} 天前`, `${Math.floor(seconds / 86_400)} days ago`);
 }
 
 export function pageName(item: Pick<HtmlFile, "path" | "title">): string {
@@ -97,8 +98,8 @@ export function PreviewButton({ tool, id }: { tool: ToolId; id: string }) {
       const code = (failure as { code?: string }).code;
       setError(
         code === "picks_bad_port"
-          ? "这个端口不能预览：要在 1024 到 65535 之间，且不是 MirrorMix 自己的端口。"
-          : "没有保存。确认 MirrorMix 还在运行。",
+          ? tr("这个端口不能预览：要在 1024 到 65535 之间，且不是 MirrorMix 自己的端口。", "This port cannot be previewed: it must be between 1024 and 65535 and not MirrorMix's own.")
+          : tr("没有保存。确认 MirrorMix 还在运行。", "Not saved. Check that MirrorMix is still running."),
       );
       return false;
     } finally {
@@ -126,12 +127,12 @@ export function PreviewButton({ tool, id }: { tool: ToolId; id: string }) {
       const code = (failure as { code?: string }).code;
       setError(
         code === "preview_unavailable"
-          ? "外网访问下的预览地址还没准备好。确认外网访问已开启，子域名不超过 55 个字符。"
+          ? tr("外网访问下的预览地址还没准备好。确认外网访问已开启，子域名不超过 55 个字符。", "The remote preview address is not ready yet. Check that remote access is on and the subdomain is at most 55 characters.")
           : code === "bad_port"
-            ? "这个端口不能预览。端口要在 1024 到 65535 之间，且不是 MirrorMix 自己的端口。"
+            ? tr("这个端口不能预览。端口要在 1024 到 65535 之间，且不是 MirrorMix 自己的端口。", "This port cannot be previewed. It must be between 1024 and 65535 and not MirrorMix's own.")
             : code === "no_file"
-              ? "找不到这个文件，它可能被移走或改名了。"
-              : "没有打开预览。确认 MirrorMix 还在运行。",
+              ? tr("找不到这个文件，它可能被移走或改名了。", "The file was not found; it may have been moved or renamed.")
+              : tr("没有打开预览。确认 MirrorMix 还在运行。", "The preview did not open. Check that MirrorMix is still running."),
       );
     } finally {
       setOpening(null);
@@ -144,11 +145,11 @@ export function PreviewButton({ tool, id }: { tool: ToolId; id: string }) {
     const text = newPort.trim();
     const port = Number(text);
     if (!name) {
-      setError("请给服务起个名字，比如“前端页面”。");
+      setError(tr("请给服务起个名字，比如“前端页面”。", "Give the service a name, such as \"Front end\"."));
       return;
     }
     if (!/^\d{4,5}$/.test(text) || port < 1024 || port > 65535) {
-      setError("端口要在 1024 到 65535 之间，比如 5173。");
+      setError(tr("端口要在 1024 到 65535 之间，比如 5173。", "The port must be between 1024 and 65535, such as 5173."));
       return;
     }
     // The same port again takes the new name.
@@ -169,19 +170,19 @@ export function PreviewButton({ tool, id }: { tool: ToolId; id: string }) {
       <button
         type="button"
         className={open ? "icon-button is-on" : "icon-button"}
-        aria-label="浏览器：打开这个项目的网页文件和本地服务"
+        aria-label={tr("浏览器：打开这个项目的网页文件和本地服务", "Browser: open this project's web files and local services")}
         aria-expanded={open}
         aria-haspopup="dialog"
-        title="浏览器：这个项目的网页文件和本地服务"
+        title={tr("浏览器：这个项目的网页文件和本地服务", "Browser: this project's web files and local services")}
         onClick={() => setOpen((value) => !value)}
       >
         <GlobeIcon />
       </button>
       {open && (
         <PanelHost stage={stage}>
-        <div className={stage ? "preview-menu is-docked" : "preview-menu"} role="dialog" aria-label="浏览器" ref={menu} data-dock-panel="">
+        <div className={stage ? "preview-menu is-docked" : "preview-menu"} role="dialog" aria-label={tr("浏览器", "Browser")} ref={menu} data-dock-panel="">
           <div className="preview-bar">
-            <div className="preview-tabs" role="tablist" aria-label="浏览器列表">
+            <div className="preview-tabs" role="tablist" aria-label={tr("浏览器列表", "Browser list")}>
               {(["files", "services"] as const).map((key) => (
                 <button
                   key={key}
@@ -191,21 +192,21 @@ export function PreviewButton({ tool, id }: { tool: ToolId; id: string }) {
                   className={tab === key ? "preview-tab is-on" : "preview-tab"}
                   onClick={() => { setTab(key); setError(""); }}
                 >
-                  {key === "files" ? "文件" : "服务"}
+                  {key === "files" ? tr("文件", "Files") : tr("服务", "Services")}
                   {view && <span className="preview-tab-count">{key === "files" ? fileRows.length : pickedPorts.length}</span>}
                 </button>
               ))}
             </div>
-            <button type="button" className="icon-button preview-close" aria-label="关闭浏览器面板" title="关闭" onClick={() => setOpen(false)}>
+            <button type="button" className="icon-button preview-close" aria-label={tr("关闭浏览器面板", "Close the browser panel")} title={tr("关闭", "Close")} onClick={() => setOpen(false)}>
               <CloseIcon />
             </button>
           </div>
           <div className="preview-body">
           {loadFailed ? (
             <p className="preview-empty">
-              没有读到这个项目的浏览器列表。确认 MirrorMix 还在运行。
+              {tr("没有读到这个项目的浏览器列表。确认 MirrorMix 还在运行。", "Could not load this project's browser list. Check that MirrorMix is still running.")}
               <button type="button" className="link-button" onClick={() => void refresh()}>
-                重试
+                {tr("重试", "Retry")}
               </button>
             </p>
           ) : view === null ? (
@@ -215,7 +216,7 @@ export function PreviewButton({ tool, id }: { tool: ToolId; id: string }) {
           ) : (
             <>
               {tab === "files" && (fileRows.length === 0 ? (
-                <p className="preview-empty">还没有文件。在资源管理器里预览 HTML 或 Markdown 文件时，点右上角的 ＋ 加到这里。</p>
+                <p className="preview-empty">{tr("还没有文件。在资源管理器里预览 HTML 或 Markdown 文件时，点右上角的 ＋ 加到这里。", "No files yet. When previewing an HTML or Markdown file in Files, click ＋ at the top right to add it here.")}</p>
               ) : (
                 <ul className="preview-list">
                   {fileRows.map((item) => {
@@ -228,22 +229,22 @@ export function PreviewButton({ tool, id }: { tool: ToolId; id: string }) {
                           type="button"
                           disabled={busy || missing}
                           className={missing ? "is-off" : undefined}
-                          title={missing ? `${item.path}\n文件已经不在这个文件夹里了` : `${name}\n${item.path}`}
+                          title={missing ? tr(`${item.path}\n文件已经不在这个文件夹里了`, `${item.path}\nThe file is no longer in this folder`) : `${name}\n${item.path}`}
                           onClick={() => void show(key, { tool, id, file: item.path })}
                         >
                           <span className="preview-file">
                             <span className="preview-title">{name}</span>
                             <span className="preview-folder">{item.path}</span>
                           </span>
-                          <span className="preview-name">{missing ? "文件不在了" : "modifiedAt" in item && item.modifiedAt ? ago(item.modifiedAt) : ""}</span>
+                          <span className="preview-name">{missing ? tr("文件不在了", "File gone") : "modifiedAt" in item && item.modifiedAt ? ago(item.modifiedAt) : ""}</span>
                           {opening === key && <Spinner />}
                         </button>
                         <button
                           type="button"
                           className="preview-remove"
                           disabled={busy}
-                          aria-label={`从列表移除 ${name}`}
-                          title="从列表移除"
+                          aria-label={tr(`从列表移除 ${name}`, `Remove ${name} from the list`)}
+                          title={tr("从列表移除", "Remove from the list")}
                           onClick={() => void save(pickedFiles.filter((file) => file !== item.path), pickedPorts)}
                         >
                           <TrashIcon />
@@ -255,7 +256,7 @@ export function PreviewButton({ tool, id }: { tool: ToolId; id: string }) {
               ))}
 
               {tab === "services" && (pickedPorts.length === 0 && !adding ? (
-                <p className="preview-empty">还没有服务。添加一个，填上名字和端口。</p>
+                <p className="preview-empty">{tr("还没有服务。添加一个，填上名字和端口。", "No services yet. Add one with a name and a port.")}</p>
               ) : (
                 <ul className="preview-list">
                   {pickedPorts.map((item) => {
@@ -268,23 +269,23 @@ export function PreviewButton({ tool, id }: { tool: ToolId; id: string }) {
                           type="button"
                           disabled={busy || checking || stopped}
                           className={stopped ? "is-off" : undefined}
-                          title={stopped ? `localhost:${item.port} 现在没有运行，启动后再打开。` : `localhost:${item.port}`}
+                          title={stopped ? tr(`localhost:${item.port} 现在没有运行，启动后再打开。`, `localhost:${item.port} is not running; start it, then open it.`) : `localhost:${item.port}`}
                           onClick={() => void show(key, { port: item.port })}
                         >
                           <span className={stopped ? "preview-dot" : checking ? "preview-dot is-checking" : "preview-dot is-on"} aria-hidden="true" />
                           <span className="preview-file">
-                            <span className="preview-title">{item.name || "未命名服务"}</span>
+                            <span className="preview-title">{item.name || tr("未命名服务", "Unnamed service")}</span>
                             <span className="preview-folder">localhost:{item.port}</span>
                           </span>
-                          <span className="preview-name">{checking ? "" : stopped ? "未运行" : "运行中"}</span>
+                          <span className="preview-name">{checking ? "" : stopped ? tr("未运行", "Not running") : tr("运行中", "Running")}</span>
                           {opening === key && <Spinner />}
                         </button>
                         <button
                           type="button"
                           className="preview-remove"
                           disabled={busy}
-                          aria-label={`移除服务 ${item.name || item.port}`}
-                          title="移除服务"
+                          aria-label={tr(`移除服务 ${item.name || item.port}`, `Remove service ${item.name || item.port}`)}
+                          title={tr("移除服务", "Remove service")}
                           onClick={() => void save(pickedFiles, pickedPorts.filter((row) => row.port !== item.port))}
                         >
                           <TrashIcon />
@@ -296,15 +297,15 @@ export function PreviewButton({ tool, id }: { tool: ToolId; id: string }) {
               ))}
               {tab === "services" && (adding ? (
                 <form className="preview-add" onSubmit={(event) => void addService(event)}>
-                  <strong className="preview-add-title">添加服务</strong>
+                  <strong className="preview-add-title">{tr("添加服务", "Add service")}</strong>
                   <label className="preview-field">
-                    <span>名字</span>
-                    <input placeholder="比如 前端页面" maxLength={80} value={newName} autoFocus enterKeyHint="next" onChange={(event) => setNewName(event.target.value)} />
+                    <span>{tr("名字", "Name")}</span>
+                    <input placeholder={tr("比如 前端页面", "e.g. Front end")} maxLength={80} value={newName} autoFocus enterKeyHint="next" onChange={(event) => setNewName(event.target.value)} />
                   </label>
                   <label className="preview-field">
-                    <span>端口</span>
+                    <span>{tr("端口", "Port")}</span>
                     <input
-                      placeholder="比如 5173"
+                      placeholder={tr("比如 5173", "e.g. 5173")}
                       inputMode="numeric"
                       pattern="[0-9]*"
                       maxLength={5}
@@ -315,17 +316,17 @@ export function PreviewButton({ tool, id }: { tool: ToolId; id: string }) {
                   </label>
                   <div className="preview-add-actions">
                     <button type="button" className="quiet-button" disabled={saving} onClick={() => { setAdding(false); setError(""); }}>
-                      取消
+                      {tr("取消", "Cancel")}
                     </button>
                     <button type="submit" className="quiet-button is-primary" disabled={saving || !newName.trim() || !newPort.trim()}>
-                      {saving ? "保存中…" : "保存"}
+                      {saving ? tr("保存中…", "Saving…") : tr("保存", "Save")}
                     </button>
                   </div>
                 </form>
               ) : (
                 <button type="button" className="preview-add-open" disabled={busy} onClick={() => { setAdding(true); setError(""); }}>
                   <PlusIcon />
-                  添加服务
+                  {tr("添加服务", "Add service")}
                 </button>
               ))}
             </>
@@ -334,9 +335,9 @@ export function PreviewButton({ tool, id }: { tool: ToolId; id: string }) {
           {error && <p className="preview-error">{error}</p>}
           {fallback && (
             <p className="preview-error">
-              浏览器拦下了新窗口。
+              {tr("浏览器拦下了新窗口。", "The browser blocked the new window. ")}
               <a href={fallback} target="_blank" rel="noreferrer" onClick={() => setOpen(false)}>
-                点这里打开
+                {tr("点这里打开", "Open it here")}
               </a>
             </p>
           )}

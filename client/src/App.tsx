@@ -22,7 +22,7 @@ import { errorText, oneLine, toolName } from "./text";
 import { useFinished } from "./useFinished";
 import { useMobile } from "./useMobile";
 import { useSession, type SessionState } from "./useSession";
-import { browserLanguage, i18n, resolveLanguage, setLanguage } from "./i18n";
+import { browserLanguage, currentLanguage, resolveLanguage, setLanguage, tr, useLanguage } from "./i18n";
 
 /** On a phone one screen shows at a time. The conversation is pushed on top of the list and has no tab bar. */
 type Screen = "list" | "chat" | "plugins" | "settings" | "workflows";
@@ -31,25 +31,25 @@ type Tone = "busy" | "ready" | "working" | "attention" | "off";
 
 /** One line that says what the session is doing right now, and how the strip under the header should look. */
 function describe(state: SessionState | null): { tone: Tone; text: string } {
-  if (!state || state.phase === "loading") return { tone: "busy", text: "正在读取会话" };
-  if (state.phase === "missing") return { tone: "attention", text: "会话不在了" };
-  if (state.opening) return { tone: "busy", text: "正在接入进程" };
-  if (state.link === "reconnecting") return { tone: "busy", text: "连接断开，正在重连" };
-  if (state.link === "polling") return { tone: "ready", text: "正在通过轮询更新会话" };
+  if (!state || state.phase === "loading") return { tone: "busy", text: tr("正在读取会话", "Loading the conversation") };
+  if (state.phase === "missing") return { tone: "attention", text: tr("会话不在了", "The conversation is gone") };
+  if (state.opening) return { tone: "busy", text: tr("正在接入进程", "Connecting to the process") };
+  if (state.link === "reconnecting") return { tone: "busy", text: tr("连接断开，正在重连", "Disconnected, reconnecting") };
+  if (state.link === "polling") return { tone: "ready", text: tr("正在通过轮询更新会话", "Updating by polling") };
   const meta = state.meta;
   if (!meta) return { tone: "off", text: "" };
-  if (meta.readOnlyReason) return { tone: "off", text: "历史记录 · 仅查看" };
+  if (meta.readOnlyReason) return { tone: "off", text: tr("历史记录 · 仅查看", "History · view only") };
   if (meta.status === "running") {
     // Following Claude Code keeps the steady signal. The pulsing control beside the title says it is live.
     if (meta.attached !== "process") return { tone: "ready", text: "" };
     if (turnOpen(state) || !meta.sendEnabled) return { tone: "working", text: "" };
     return { tone: "ready", text: "" };
   }
-  if (meta.status === "starting") return { tone: "busy", text: "正在创建" };
-  if (meta.status === "occupied") return { tone: "off", text: "未接入" };
-  if (meta.status === "exited") return { tone: "off", text: "进程已退出" };
-  if (meta.status === "failed" || meta.status === "create_failed") return { tone: "attention", text: "启动失败" };
-  return { tone: "off", text: "未接入" };
+  if (meta.status === "starting") return { tone: "busy", text: tr("正在创建", "Creating") };
+  if (meta.status === "occupied") return { tone: "off", text: tr("未接入", "Not connected") };
+  if (meta.status === "exited") return { tone: "off", text: tr("进程已退出", "Process exited") };
+  if (meta.status === "failed" || meta.status === "create_failed") return { tone: "attention", text: tr("启动失败", "Failed to start") };
+  return { tone: "off", text: tr("未接入", "Not connected") };
 }
 
 function turnOpen(state: SessionState | null): boolean {
@@ -59,35 +59,37 @@ function turnOpen(state: SessionState | null): boolean {
 function composerHint(state: SessionState | null, mobile: boolean): string {
   const hint = desktopHint(state);
   // A phone keyboard's return key makes a new line; the button sends.
-  return mobile ? hint.replace("。Enter 发送，Shift+Enter 换行", "") : hint;
+  return mobile ? hint.replace("。Enter 发送，Shift+Enter 换行", "").replace(". Enter sends, Shift+Enter starts a new line", "") : hint;
 }
 
 function desktopHint(state: SessionState | null): string {
-  if (!state || state.phase === "loading") return "正在读取会话";
-  if (state.opening) return "正在接入进程，接上后就能发送";
+  if (!state || state.phase === "loading") return tr("正在读取会话", "Loading the conversation");
+  if (state.opening) return tr("正在接入进程，接上后就能发送", "Connecting to the process. You can send once it is connected");
   const meta = state.meta;
-  if (meta?.readOnlyReason === "deepseek_app_session") return "打开 DSH 后才能从这里继续这条会话";
-  if (meta?.readOnlyReason) return "这条历史记录目前只能查看，请在桌面端打开对应会话后刷新";
-  if (!meta || meta.status !== "running") return "进程没有在运行，重新接入后才能发送";
+  if (meta?.readOnlyReason === "deepseek_app_session") return tr("打开 DSH 后才能从这里继续这条会话", "Open DSH to continue this conversation from here");
+  if (meta?.readOnlyReason) return tr("这条历史记录目前只能查看，请在桌面端打开对应会话后刷新", "This history is view only for now. Open the conversation in the desktop app, then refresh");
+  if (!meta || meta.status !== "running") return tr("进程没有在运行，重新接入后才能发送", "The process is not running. Reconnect to send");
   if (meta.takenOver) {
     return turnOpen(state)
-      ? "已由 MirrorMix 接管。这一轮还在进行，现在发送会排进队列"
+      ? tr("已由 MirrorMix 接管。这一轮还在进行，现在发送会排进队列", "MirrorMix has taken over. This turn is still going, so a message sent now is queued")
       : meta.tool === "deepseek"
-        ? "这条由 DSH 的命令行在后台回复。桌面端要重新打开这条会话才看得到新内容"
+        ? tr("这条由 DSH 的命令行在后台回复。桌面端要重新打开这条会话才看得到新内容", "DSH's command line replies to this in the background. Reopen the conversation in the desktop app to see new content")
         : meta.tool === "cursor"
-        ? "Cursor 窗口发不出去（比如锁屏了），这条由 Cursor 命令行在后台回复。Cursor 窗口里可能看不到"
-        : "Claude 桌面版发不出去（比如锁屏了），已由 MirrorMix 接管。桌面版要重新点开这条会话才看得到新内容";
+        ? tr("Cursor 窗口发不出去（比如锁屏了），这条由 Cursor 命令行在后台回复。Cursor 窗口里可能看不到", "The Cursor window cannot send (the screen may be locked), so Cursor's command line replies in the background. It may not show in the Cursor window")
+        : tr("Claude 桌面版发不出去（比如锁屏了），已由 MirrorMix 接管。桌面版要重新点开这条会话才看得到新内容", "The Claude desktop app cannot send (the screen may be locked), so MirrorMix has taken over. Reopen the conversation in the desktop app to see new content");
   }
-  if (meta.inputPrompt) return "终端正在等待确认，请查看上方提示";
-  if (meta.attached !== "process" && turnOpen(state)) return "消息响应中...";
-  if (meta.attached !== "process") return `写到 ${toolName[meta.tool]} 桌面端的同一条会话。Enter 发送，Shift+Enter 换行`;
-  if (meta.sendEnabled && turnOpen(state)) return "这一轮还在进行。现在发送会排进队列";
-  if (meta.sendEnabled) return "写给这个会话。Enter 发送，Shift+Enter 换行";
-  return "这一轮结束后才能发送";
+  if (meta.inputPrompt) return tr("终端正在等待确认，请查看上方提示", "The terminal is waiting for a confirmation. See the prompt above");
+  if (meta.attached !== "process" && turnOpen(state)) return tr("消息响应中...", "Replying...");
+  if (meta.attached !== "process") return tr(`写到 ${toolName[meta.tool]} 桌面端的同一条会话。Enter 发送，Shift+Enter 换行`, `Writes to the same conversation in the ${toolName[meta.tool]} desktop app. Enter sends, Shift+Enter starts a new line`);
+  if (meta.sendEnabled && turnOpen(state)) return tr("这一轮还在进行。现在发送会排进队列", "This turn is still going. A message sent now is queued");
+  if (meta.sendEnabled) return tr("写给这个会话。Enter 发送，Shift+Enter 换行", "Write to this conversation. Enter sends, Shift+Enter starts a new line");
+  return tr("这一轮结束后才能发送", "You can send once this turn ends");
 }
 
 
 export function App({ onLogout }: { onLogout?: () => void }) {
+  // Everything below shows fixed copy in the chosen language, so a switch renders the page again.
+  useLanguage();
   const [tool, setTool] = useState<ToolId>("claude");
   // The list opens on the sessions still replying, across all tools.
   const [railView, setRailView] = useState<RailView>("running");
@@ -176,18 +178,18 @@ export function App({ onLogout }: { onLogout?: () => void }) {
   useEffect(() => {
     if (!prefs) return;
     const next = resolveLanguage(prefs.language, browserLanguage());
-    if (i18n.language !== next) void setLanguage(next);
+    if (currentLanguage() !== next) void setLanguage(next);
   }, [prefs]);
 
   const changeLanguage = useCallback(async (language: "zh-CN" | "en") => {
-    const before = i18n.language as "zh-CN" | "en";
+    const before = currentLanguage();
     await setLanguage(language);
     try {
       setPrefs(await api.saveSettings({ language }));
       setSettingsError("");
     } catch {
       await setLanguage(before);
-      setSettingsError("设置没有保存，请再试一次。");
+      setSettingsError(tr("设置没有保存，请再试一次。", "Settings were not saved. Please try again."));
     }
   }, []);
 
@@ -233,7 +235,7 @@ export function App({ onLogout }: { onLogout?: () => void }) {
       },
       () => {
         if (prefsRef.current === next) setPrefs(before);
-        setNotice("没有钉住。确认 MirrorMix 进程还在运行，再试一次。");
+        setNotice(tr("没有钉住。确认 MirrorMix 进程还在运行，再试一次。", "Not pinned. Check that MirrorMix is still running and try again."));
       },
     );
   }, []);
@@ -252,7 +254,7 @@ export function App({ onLogout }: { onLogout?: () => void }) {
       },
       () => {
         if (prefsRef.current === next) setPrefs(before);
-        setSettingsError("设置没有保存。确认 MirrorMix 进程还在运行，再试一次。");
+        setSettingsError(tr("设置没有保存。确认 MirrorMix 进程还在运行，再试一次。", "Settings were not saved. Check that MirrorMix is still running and try again."));
       },
     );
   }, []);
@@ -261,7 +263,7 @@ export function App({ onLogout }: { onLogout?: () => void }) {
     setChecking(true);
     setSettingsError("");
     const reached = await refreshPrefs();
-    if (!reached) setSettingsError("检测没有完成。确认 MirrorMix 进程还在运行，再试一次。");
+    if (!reached) setSettingsError(tr("检测没有完成。确认 MirrorMix 进程还在运行，再试一次。", "The check did not finish. Check that MirrorMix is still running and try again."));
     setChecking(false);
   }, [refreshPrefs]);
 
@@ -506,7 +508,7 @@ export function App({ onLogout }: { onLogout?: () => void }) {
       setConfirmingDelete(false);
       clear();
       await refreshCatalog();
-      setNotice(removed === "trash" ? "会话已删除，文件放进了回收站。" : "会话已从列表移除。它在原来的应用里还在。");
+      setNotice(removed === "trash" ? tr("会话已删除，文件放进了回收站。", "Conversation deleted; its file is in the Recycle Bin.") : tr("会话已从列表移除。它在原来的应用里还在。", "Conversation removed from the list. It is still in its own app."));
       if (mobile) leaveChat();
     } catch (error) {
       setNotice(errorText((error as { code?: string }).code));
@@ -547,7 +549,7 @@ export function App({ onLogout }: { onLogout?: () => void }) {
     } catch (error) {
       const code = (error as { code?: string }).code;
       if (code === "not_idle") {
-        setNotice(meta.attached === "claude" ? "Claude 正在回复，等这一轮结束再发。" : "消息没有发出。这一轮还没结束，等它完成再发。");
+        setNotice(meta.attached === "claude" ? tr("Claude 正在回复，等这一轮结束再发。", "Claude is replying. Send once this turn ends.") : tr("消息没有发出。这一轮还没结束，等它完成再发。", "The message was not sent. This turn has not ended; send once it finishes."));
       } else {
         setNotice(errorText(code));
       }
@@ -577,7 +579,7 @@ export function App({ onLogout }: { onLogout?: () => void }) {
   }
 
   const status = describe(state);
-  const title = meta?.title || summary?.title || "会话";
+  const title = meta?.title || summary?.title || tr("会话", "Conversation");
   const workspacePath = meta?.workspacePath || summary?.path || "";
   const sessionKey = target ? `${target.tool}:${target.id}` : "";
   const terminalPanelKey = workspacePath ? workspaceTerminalKey(workspacePath) : "";
@@ -744,42 +746,46 @@ export function App({ onLogout }: { onLogout?: () => void }) {
           <div className="welcome">
             <button type="button" className="quiet-button rail-open" onClick={() => setRailOpen(true)}>
               <MenuIcon />
-              会话列表
+              {tr("会话列表", "Conversations")}
             </button>
             {workbenchQuiet && <TodayStats tools={shownTools} onOpen={chooseIn} />}
             {railView === "pinned" ? (
               <>
-                <h1>钉住的会话</h1>
-                <p>左侧是你在各个 AI 工具里钉住的会话，按工具分组。点开一条就能接着聊。</p>
-                <p>要钉住一条会话，打开它，点右上角的钉；再点一次取消。钉只记在 MirrorMix 里，不会改动 AI 工具自己的置顶。</p>
+                <h1>{tr("钉住的会话", "Pinned conversations")}</h1>
+                <p>{tr("左侧是你在各个 AI 工具里钉住的会话，按工具分组。点开一条就能接着聊。", "On the left are the conversations you pinned in each AI tool, grouped by tool. Open one to carry on.")}</p>
+                <p>{tr("要钉住一条会话，打开它，点右上角的钉；再点一次取消。钉只记在 MirrorMix 里，不会改动 AI 工具自己的置顶。", "To pin a conversation, open it and click the pin at the top right; click again to unpin. Pins live only in MirrorMix and do not change the AI tool's own pinning.")}</p>
               </>
             ) : railView === "running" ? null : usable ? (
               <>
-                <h1>选一条会话，接着聊</h1>
+                <h1>{tr("选一条会话，接着聊", "Pick a conversation and carry on")}</h1>
                 <p>
-                  左侧按工作区列出了这台机器上 {toolName[tool]} 的会话。打开其中一条，MirrorMix
-                  会在它的工作区里接入进程，你在这里写的话会直接送进去。
+                  {tr(
+                    `左侧按工作区列出了这台机器上 ${toolName[tool]} 的会话。打开其中一条，MirrorMix 会在它的工作区里接入进程，你在这里写的话会直接送进去。`,
+                    `The list on the left shows this computer's ${toolName[tool]} conversations by workspace. Open one and MirrorMix connects to it in its workspace, so what you write here goes straight in.`,
+                  )}
                 </p>
-                <p>想从头开始，点工作区名字右边的加号。</p>
+                <p>{tr("想从头开始，点工作区名字右边的加号。", "To start fresh, click the plus next to a workspace's name.")}</p>
               </>
             ) : shownTools.length === 0 ? (
               <>
-                <h1>先选择要用的 AI 工具</h1>
-                <p>设置里一个工具都没有打开。选中的工具会显示在左侧。</p>
+                <h1>{tr("先选择要用的 AI 工具", "Choose the AI tools to use first")}</h1>
+                <p>{tr("设置里一个工具都没有打开。选中的工具会显示在左侧。", "No tool is switched on in Settings. The tools you choose show on the left.")}</p>
                 <button type="button" className="quiet-button" onClick={openSettings}>
-                  打开设置
+                  {tr("打开设置", "Open settings")}
                 </button>
               </>
             ) : (
               <>
-                <h1>没有检测到开启的 AI 工具</h1>
+                <h1>{tr("没有检测到开启的 AI 工具", "No open AI tool found")}</h1>
                 <p>
-                  {shownTools.map((item) => toolName[item]).join("、")} 的客户端都没有在本机开启。打开其中一个，
-                  这里会在几秒内自动恢复。
+                  {tr(
+                    `${shownTools.map((item) => toolName[item]).join("、")} 的客户端都没有在本机开启。打开其中一个，这里会在几秒内自动恢复。`,
+                    `None of ${shownTools.map((item) => toolName[item]).join(", ")} is open on this computer. Open one and this page recovers within a few seconds.`,
+                  )}
                 </p>
                 <button type="button" className="quiet-button" disabled={checking} onClick={() => void checkNow()}>
                   {checking && <Spinner />}
-                  {checking ? "正在检测" : "重新检测"}
+                  {checking ? tr("正在检测", "Checking") : tr("重新检测", "Check again")}
                 </button>
               </>
             )}
@@ -791,11 +797,11 @@ export function App({ onLogout }: { onLogout?: () => void }) {
           <>
             <header className="session-head">
               {mobile ? (
-                <button type="button" className="icon-button back-button" aria-label="返回会话列表" onClick={leaveChat}>
+                <button type="button" className="icon-button back-button" aria-label={tr("返回会话列表", "Back to conversations")} onClick={leaveChat}>
                   <BackIcon />
                 </button>
               ) : (
-                <button type="button" className="icon-button rail-open" aria-label="打开会话列表" onClick={() => setRailOpen(true)}>
+                <button type="button" className="icon-button rail-open" aria-label={tr("打开会话列表", "Open conversations")} onClick={() => setRailOpen(true)}>
                   <MenuIcon />
                 </button>
               )}
@@ -808,15 +814,15 @@ export function App({ onLogout }: { onLogout?: () => void }) {
                 )}
                 {canReopen && (
                   <button type="button" className="quiet-button" onClick={() => choose(target.id)}>
-                    重新接入
+                    {tr("重新接入", "Reconnect")}
                   </button>
                 )}
                 {meta?.status === "running" && (
                   <button
                     type="button"
                     className="follow-button"
-                    aria-label={meta.attached !== "process" ? "停止跟随" : "关闭进程"}
-                    title={meta.attached !== "process" ? "正在跟随桌面端里的这条会话。点击停止跟随" : "运行中。放上去后点击，关闭进程"}
+                    aria-label={meta.attached !== "process" ? tr("停止跟随", "Stop following") : tr("关闭进程", "Close the process")}
+                    title={meta.attached !== "process" ? tr("正在跟随桌面端里的这条会话。点击停止跟随", "Following this conversation in the desktop app. Click to stop following") : tr("运行中。放上去后点击，关闭进程", "Running. Hover, then click to close the process")}
                     onClick={() => void closeSession()}
                   >
                     <span className="follow-ring" aria-hidden="true" />
@@ -835,8 +841,8 @@ export function App({ onLogout }: { onLogout?: () => void }) {
                     type="button"
                     className={isPinned ? "icon-button session-pin is-on" : "icon-button session-pin"}
                     aria-pressed={isPinned}
-                    aria-label={isPinned ? "取消钉住" : "钉住这条会话"}
-                    title={isPinned ? "取消钉住" : "钉住：放到左侧“钉住”里，随时打开"}
+                    aria-label={isPinned ? tr("取消钉住", "Unpin") : tr("钉住这条会话", "Pin this conversation")}
+                    title={isPinned ? tr("取消钉住", "Unpin") : tr("钉住：放到左侧“钉住”里，随时打开", "Pin: keep it under Pinned on the left, to open any time")}
                     disabled={!prefs}
                     onClick={() => togglePin(target.tool, target.id)}
                   >
@@ -849,8 +855,8 @@ export function App({ onLogout }: { onLogout?: () => void }) {
                 <button
                   type="button"
                   className={confirmingDelete ? "icon-button session-delete is-on" : "icon-button session-delete"}
-                  aria-label="删除会话"
-                  title="删除会话"
+                  aria-label={tr("删除会话", "Delete conversation")}
+                  title={tr("删除会话", "Delete conversation")}
                   disabled={!state || state.phase !== "ready"}
                   onClick={() => setConfirmingDelete((value) => !value)}
                 >
@@ -863,35 +869,36 @@ export function App({ onLogout }: { onLogout?: () => void }) {
             <div className="thread-stage">
               {notice && <p className="banner is-warning">{notice}</p>}
               {confirmingDelete && target && meta?.deletable && (
-                <div className="banner is-question" role="alertdialog" aria-label="删除会话">
+                <div className="banner is-question" role="alertdialog" aria-label={tr("删除会话", "Delete conversation")}>
                   <p>
-                    删除“{oneLine(title)}”？
+                    {tr(`删除“${oneLine(title)}”？`, `Delete "${oneLine(title)}"? `)}
                     {target.tool === "cursor" || target.tool === "deepseek"
-                      ? `${toolName[target.tool]} 的会话只会从这里的列表移除，${toolName[target.tool]} 里还在。`
-                      : "如果它在桌面版里，只会从这里的列表移除；只在命令行用过的，会把记录文件移到回收站，需要时可以从回收站还原。"}
+                      ? tr(`${toolName[target.tool]} 的会话只会从这里的列表移除，${toolName[target.tool]} 里还在。`, `A ${toolName[target.tool]} conversation is only removed from this list; it stays in ${toolName[target.tool]}.`)
+                      : tr("如果它在桌面版里，只会从这里的列表移除；只在命令行用过的，会把记录文件移到回收站，需要时可以从回收站还原。", "If it is in the desktop app, it is only removed from this list. One used only from the command line has its record file moved to the Recycle Bin, where it can be restored.")}
                   </p>
                   <div className="banner-actions">
                     <button type="button" className="quiet-button is-danger" disabled={deleting} onClick={() => void deleteSession()}>
-                      {deleting ? "正在删除…" : "删除"}
+                      {deleting ? tr("正在删除…", "Deleting…") : tr("删除", "Delete")}
                     </button>
                     <button type="button" className="quiet-button" disabled={deleting} onClick={() => setConfirmingDelete(false)}>
-                      取消
+                      {tr("取消", "Cancel")}
                     </button>
                   </div>
                 </div>
               )}
               {meta?.question === "trust" && (
-                <div className="banner is-question" role="alertdialog" aria-label="是否信任这个文件夹">
+                <div className="banner is-question" role="alertdialog" aria-label={tr("是否信任这个文件夹", "Trust this folder?")}>
                   <p>
-                    {meta.tool === "codex" ? "Codex" : "Claude"} 第一次在这个文件夹里以命令行运行，先确认是否信任
-                    <code>{workspacePath}</code>。信任后它可以读写、执行这个文件夹里的文件，以后不会再问。
+                    {tr(`${meta.tool === "codex" ? "Codex" : "Claude"} 第一次在这个文件夹里以命令行运行，先确认是否信任`, `${meta.tool === "codex" ? "Codex" : "Claude"} is running from the command line in this folder for the first time. Do you trust `)}
+                    <code>{workspacePath}</code>
+                    {tr("。信任后它可以读写、执行这个文件夹里的文件，以后不会再问。", "? Once trusted it can read, write and run the files in this folder, and it will not ask again.")}
                   </p>
                   <div className="banner-actions">
                     <button type="button" className="quiet-button is-primary" disabled={answering} onClick={() => void answerTrust("trust")}>
-                      信任并继续
+                      {tr("信任并继续", "Trust and continue")}
                     </button>
                     <button type="button" className="quiet-button" disabled={answering} onClick={() => void answerTrust("cancel")}>
-                      不信任
+                      {tr("不信任", "Don't trust")}
                     </button>
                   </div>
                 </div>
@@ -900,13 +907,13 @@ export function App({ onLogout }: { onLogout?: () => void }) {
               {meta?.readOnlyReason && <p className="banner">{errorText(meta.readOnlyReason)}</p>}
               {meta?.inputPrompt && !meta.prompt && (
                 <div className="banner is-warning">
-                  <p>终端正在等待你的选择，请在会话终端处理后继续聊天。</p>
+                  <p>{tr("终端正在等待你的选择，请在会话终端处理后继续聊天。", "The terminal is waiting for your choice. Answer it in the conversation's terminal, then carry on.")}</p>
                   <pre style={{ whiteSpace: "pre-wrap", maxHeight: 220, overflow: "auto" }}>{meta.inputPrompt}</pre>
-                  <button type="button" onClick={() => { setCmdMode("terminal"); setCmdOpen(true); }}>打开会话终端</button>
+                  <button type="button" onClick={() => { setCmdMode("terminal"); setCmdOpen(true); }}>{tr("打开会话终端", "Open the terminal")}</button>
                 </div>
               )}
               {meta?.exitNote && meta.status !== "running" && !state?.opening && (
-                <p className="banner is-warning">进程启动后就退出了，它最后输出的是：{meta.exitNote}</p>
+                <p className="banner is-warning">{tr("进程启动后就退出了，它最后输出的是：", "The process exited right after starting. Its last output was: ")}{meta.exitNote}</p>
               )}
 
               <MessageList session={session} state={state ?? PLACEHOLDER} />
@@ -947,7 +954,7 @@ export function App({ onLogout }: { onLogout?: () => void }) {
               placeholder={composerHint(state, mobile)}
               mobile={mobile}
               clearOnSend={target.tool === "cursor"}
-              respondingPlaceholder={target.tool === "cursor" ? "消息响应中" : undefined}
+              respondingPlaceholder={target.tool === "cursor" ? tr("消息响应中", "Replying") : undefined}
               queue={
                 target.tool === "cursor"
                   ? state?.messages.filter((message) => message.id.startsWith("queued-")).map((message) => message.text)
@@ -1009,7 +1016,7 @@ export function App({ onLogout }: { onLogout?: () => void }) {
 
 
       {tabs && (
-        <nav className="tabbar" aria-label="主导航">
+        <nav className="tabbar" aria-label={tr("主导航", "Main navigation")}>
           {TABS.filter((item) => WORKFLOWS_SHOWN || item.key !== "workflows").map(({ key, label, Icon }) => {
             const on = screen === "list" ? key === LIST_TAB[railView] : screen === key || (key === "settings" && screen === "plugins");
             return (
@@ -1018,7 +1025,7 @@ export function App({ onLogout }: { onLogout?: () => void }) {
                 type="button"
                 className={on ? "tab is-on" : "tab"}
                 aria-current={on ? "page" : undefined}
-                aria-label={key === "home" && homeCount.all ? `${label}，${homeCount.all} 个会话正在回复或有新回复` : label}
+                aria-label={key === "home" && homeCount.all ? tr(`${label()}，${homeCount.all} 个会话正在回复或有新回复`, `${label()}, ${homeCount.all} conversations replying or with new replies`) : label()}
                 onClick={() => {
                   if (key === "home") {
                     showRunning();
@@ -1043,7 +1050,7 @@ export function App({ onLogout }: { onLogout?: () => void }) {
                     <span className={homeCount.live ? "tab-badge is-live" : "tab-badge"}>{homeCount.all > 99 ? "99+" : homeCount.all}</span>
                   )}
                 </span>
-                <span className="tab-label">{label}</span>
+                <span className="tab-label">{label()}</span>
               </button>
             );
           })}
@@ -1073,10 +1080,10 @@ export function App({ onLogout }: { onLogout?: () => void }) {
 
 /** The phone's tab bar, in the desktop bar's order: what spans every tool first, then the tools, then the rest. */
 const TABS = [
-  { key: "home", label: "工作台", Icon: () => <WorkbenchIcon /> },
-  { key: "sessions", label: "会话", Icon: ChatsIcon },
-  { key: "workflows", label: "工作流", Icon: () => <FlowIcon size={22} /> },
-  { key: "settings", label: "设置", Icon: GearIcon },
+  { key: "home", label: () => tr("工作台", "Home"), Icon: () => <WorkbenchIcon /> },
+  { key: "sessions", label: () => tr("会话", "Chats"), Icon: ChatsIcon },
+  { key: "workflows", label: () => tr("工作流", "Workflows"), Icon: () => <FlowIcon size={22} /> },
+  { key: "settings", label: () => tr("设置", "Settings"), Icon: GearIcon },
 ] as const;
 
 /** Which tab the list screen belongs to, by what it is showing. */

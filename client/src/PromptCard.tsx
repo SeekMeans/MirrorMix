@@ -3,12 +3,13 @@ import { api, type ToolId, type ToolPrompt } from "./api";
 import { Spinner } from "./icons";
 import { errorText, toolName } from "./text";
 
-const KIND_LABEL: Record<ToolPrompt["kind"], string> = {
-  permission: "等你确认",
-  question: "等你选择",
-  plan: "计划待批准",
-  trust: "等你确认",
-};
+import { tr } from "./i18n";
+const KIND_LABEL = (): Record<ToolPrompt["kind"], string> => ({
+  permission: tr("等你确认", "Needs your OK"),
+  question: tr("等你选择", "Needs your choice"),
+  plan: tr("计划待批准", "Plan to approve"),
+  trust: tr("等你确认", "Needs your OK"),
+});
 
 /** Lines of detail shown before "展开全部": enough for a command or a short diff, not a whole plan. */
 const FOLDED_LINES = 10;
@@ -53,7 +54,7 @@ export function PromptCard({ tool, sessionId, prompt }: { tool: ToolId; sessionI
       <div className="prompt-top">
         <span className="prompt-kind">
           <span className="prompt-pulse" aria-hidden="true" />
-          {KIND_LABEL[prompt.kind]}
+          {KIND_LABEL()[prompt.kind]}
         </span>
         {prompt.header && <span className="prompt-chip">{prompt.header}</span>}
         <span className="prompt-where">{toolName[tool]}</span>
@@ -66,7 +67,7 @@ export function PromptCard({ tool, sessionId, prompt }: { tool: ToolId; sessionI
           <pre>{shownDetail}</pre>
           {long && (
             <button type="button" className="link-button prompt-unfold" onClick={() => setUnfolded((open) => !open)}>
-              {unfolded ? "收起" : `展开全部（${lines.length} 行）`}
+              {unfolded ? tr("收起", "Show less") : tr(`展开全部（${lines.length} 行）`, `Show all (${lines.length} lines)`)}
             </button>
           )}
         </div>
@@ -84,10 +85,10 @@ export function PromptCard({ tool, sessionId, prompt }: { tool: ToolId; sessionI
               ))}
             </ul>
           )}
-          <p className="prompt-note">这个需要在 {toolName[tool]} 里直接回答，回答后这里会接着显示。</p>
+          <p className="prompt-note">{tr(`这个需要在 ${toolName[tool]} 里直接回答，回答后这里会接着显示。`, `Answer this in ${toolName[tool]} itself; this page carries on once it is answered.`)}</p>
         </>
       ) : listed ? (
-        <div className="prompt-choices" role="group" aria-label="选项">
+        <div className="prompt-choices" role="group" aria-label={tr("选项", "Options")}>
           {prompt.options.map((option, index) => (
             <button
               key={option.id}
@@ -107,7 +108,7 @@ export function PromptCard({ tool, sessionId, prompt }: { tool: ToolId; sessionI
           ))}
         </div>
       ) : (
-        <div className="prompt-actions" role="group" aria-label="选项">
+        <div className="prompt-actions" role="group" aria-label={tr("选项", "Options")}>
           {prompt.options.map((option) => (
             <button
               key={option.id}

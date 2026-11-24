@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useSta
 import { createPortal } from "react-dom";
 import { SearchIcon } from "./icons";
 
+import { tr } from "./i18n";
 export interface SelectOption {
   value: string;
   label: string;
@@ -32,11 +33,11 @@ export function Select({
   value,
   options,
   onChange,
-  placeholder = "请选择",
+  placeholder = tr("请选择", "Choose"),
   ariaLabel,
   rich = false,
-  searchHint = "搜索",
-  empty = "没有可选的项",
+  searchHint = tr("搜索", "Search"),
+  empty = tr("没有可选的项", "Nothing to choose"),
   className = "",
   disabled = false,
 }: {
@@ -174,7 +175,7 @@ export function Select({
         <div className="mm-select-sheet-head">
           <strong>{ariaLabel ?? placeholder}</strong>
           <button type="button" className="mm-select-sheet-done" onClick={() => hide()}>
-            完成
+            {tr("完成", "Done")}
           </button>
         </div>
       )}
@@ -223,7 +224,7 @@ export function Select({
             </li>
           );
         })}
-        {shown.length === 0 && <li className="mm-select-none">{needle ? "没有匹配的结果" : empty}</li>}
+        {shown.length === 0 && <li className="mm-select-none">{needle ? tr("没有匹配的结果", "No matches") : empty}</li>}
       </ul>
     </div>
   );
@@ -237,7 +238,7 @@ export function Select({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
-        aria-label={ariaLabel ? `${ariaLabel}：${chosen?.label ?? placeholder}` : undefined}
+        aria-label={ariaLabel ? tr(`${ariaLabel}：${chosen?.label ?? placeholder}`, `${ariaLabel}: ${chosen?.label ?? placeholder}`) : undefined}
         disabled={disabled}
         onClick={() => (open ? hide() : show())}
         onKeyDown={(event) => {

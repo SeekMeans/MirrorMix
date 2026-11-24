@@ -31,6 +31,7 @@ import {
   Spinner,
 } from "./icons";
 import { ToolIcon } from "./ToolIcon";
+import { tr, useLanguage } from "./i18n";
 import {
   oneLine,
   relativeTime,
@@ -62,10 +63,10 @@ function PinnedQuota({ quota }: { quota: ToolQuota }) {
       title={quota.title}
     >
       {ahead
-        ? `${timeUntil(resetsAt!, now)}后重置 · ${percent}%`
+        ? tr(`${timeUntil(resetsAt!, now)}后重置 · ${percent}%`, `Resets in ${timeUntil(resetsAt!, now)} · ${percent}%`)
         : quota.resetLabel
           ? `${quota.resetLabel} · ${percent}%`
-          : `${window_} ${percent}%`}
+          : `${quotaWords(window_)} ${percent}%`}
     </span>
   );
 }
@@ -104,6 +105,7 @@ const SessionRow = memo(function SessionRow({
   loading: boolean;
   onChoose: (id: string) => void;
 }) {
+  useLanguage();
   const label =
     session.status === "starting" ||
     session.status === "failed" ||
@@ -137,8 +139,8 @@ const SessionRow = memo(function SessionRow({
         ) : label ? (
           <span className={`session-state is-${session.status}`}>{label}</span>
         ) : session.asking ? (
-          <span className="session-state is-asking" title="它在等你确认或选择">
-            等你确认
+          <span className="session-state is-asking" title={tr("它在等你确认或选择", "It is waiting for you to confirm or choose")}>
+            {tr("等你确认", "Needs you")}
           </span>
         ) : session.working ? (
           <span className="session-state is-running">
@@ -177,6 +179,7 @@ const SessionCard = memo(function SessionCard({
   loading: boolean;
   onChoose: (id: string) => void;
 }) {
+  useLanguage();
   const live = session.working;
   return (
     <button
@@ -196,7 +199,7 @@ const SessionCard = memo(function SessionCard({
         </time>
       </span>
       <span className="home-card-title">
-        {oneLine(session.title) || "新会话"}
+        {oneLine(session.title) || tr("新会话", "New conversation")}
       </span>
       <span className="home-card-state">
         {loading ? (
@@ -204,17 +207,17 @@ const SessionCard = memo(function SessionCard({
         ) : session.asking ? (
           <>
             <span className="asking-dot" aria-hidden="true" />
-            等你确认，点开回答
+            {tr("等你确认，点开回答", "Needs you; open to answer")}
           </>
         ) : live ? (
           <>
-            <BusyIcon label="正在回复" />
-            正在回复
+            <BusyIcon label={tr("正在回复", "Replying")} />
+            {tr("正在回复", "Replying")}
           </>
         ) : (
           <>
             <BoltIcon />
-            {done || session.unseen ? "回复完了，等你查看" : "回复完了"}
+            {done || session.unseen ? tr("回复完了，等你查看", "Replied; waiting for you") : tr("回复完了", "Replied")}
           </>
         )}
       </span>
@@ -271,6 +274,7 @@ export interface SidebarProps {
 }
 
 export const Sidebar = memo(function Sidebar(props: SidebarProps) {
+  useLanguage();
   const { tool, catalog, offline, selectedId, loadingId, creatingPath } = props;
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [unfolded, setUnfolded] = useState<Set<string>>(() => new Set());
@@ -444,19 +448,19 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
   return (
     <aside
       className={props.mobile ? "rail is-screen" : "rail has-bar"}
-      aria-label="会话列表"
+      aria-label={tr("会话列表", "Conversations")}
     >
       {!props.mobile && (
         // The narrow bar on the far left: 工作台 (what every tool is doing now), then one entry per AI tool.
-        <nav className="tool-bar" aria-label="导航">
+        <nav className="tool-bar" aria-label={tr("导航", "Navigation")}>
           <button
             type="button"
             className={
               running && !(props.pluginsActive || props.workflowsActive) ? "bar-item active" : "bar-item"
             }
             aria-current={running && !(props.pluginsActive || props.workflowsActive) ? "page" : undefined}
-            aria-label={`工作台，${busyCount} 个运行中或有新回复的会话`}
-            title="工作台：各个 AI 工具里正在回复和回复完还没看的会话"
+            aria-label={tr(`工作台，${busyCount} 个运行中或有新回复的会话`, `Home, ${busyCount} conversations running or with new replies`)}
+            title={tr("工作台：各个 AI 工具里正在回复和回复完还没看的会话", "Home: conversations replying in each AI tool, and replies you have not seen")}
             onClick={props.onRunning}
           >
             <span className="bar-icon">
@@ -469,7 +473,7 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
                 </span>
               )}
             </span>
-            <span className="bar-label">工作台</span>
+            <span className="bar-label">{tr("工作台", "Home")}</span>
           </button>
           <button
             type="button"
@@ -481,14 +485,14 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
             aria-current={
               pinnedView && !(props.pluginsActive || props.workflowsActive) ? "page" : undefined
             }
-            aria-label="钉住"
-            title="钉住：在各个 AI 工具里钉住的会话"
+            aria-label={tr("钉住", "Pinned")}
+            title={tr("钉住：在各个 AI 工具里钉住的会话", "Pinned: conversations you pinned in each AI tool")}
             onClick={props.onPinned}
           >
             <span className="bar-icon">
               <PushpinIcon filled={pinnedView && !(props.pluginsActive || props.workflowsActive)} />
             </span>
-            <span className="bar-label">钉住</span>
+            <span className="bar-label">{tr("钉住", "Pinned")}</span>
           </button>
           {/* 工作台 and 钉住 span every tool; the AI tools themselves follow below the line. */}
           {props.tools.length > 0 && (
@@ -514,7 +518,7 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
                 disabled={off}
                 title={
                   off
-                    ? `${toolName[item]} 的客户端没有在本机开启`
+                    ? tr(`${toolName[item]} 的客户端没有在本机开启`, `${toolName[item]}'s app is not open on this computer`)
                     : used != null
                       ? quota?.title
                       : toolName[item]
@@ -529,7 +533,7 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
                   <span
                     className={`tool-quota is-${quota?.level ?? "ok"}`}
                     role="meter"
-                    aria-label="限额已用"
+                    aria-label={tr("限额已用", "Limit used")}
                     aria-valuemin={0}
                     aria-valuemax={100}
                     aria-valuenow={used}
@@ -545,13 +549,13 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
               type="button"
               className={props.workflowsActive ? "bar-item bar-flows active" : "bar-item bar-flows"}
               aria-current={props.workflowsActive ? "page" : undefined}
-              title="工作流"
+              title={tr("工作流", "Workflows")}
               onClick={props.onWorkflows}
             >
               <span className="bar-icon">
                 <FlowIcon size={22} />
               </span>
-              <span className="bar-label">工作流</span>
+              <span className="bar-label">{tr("工作流", "Workflows")}</span>
             </button>
           )}
           {props.onPlugins && (
@@ -563,13 +567,13 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
                   : "bar-item bar-plugins"
               }
               aria-current={props.pluginsActive ? "page" : undefined}
-              title="我的插件"
+              title={tr("我的插件", "My plugins")}
               onClick={props.onPlugins}
             >
               <span className="bar-icon">
                 <PuzzleIcon />
               </span>
-              <span className="bar-label">插件</span>
+              <span className="bar-label">{tr("插件", "Plugins")}</span>
             </button>
           )}
           <div className="bar-more" ref={foot}>
@@ -582,8 +586,8 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
               }
               aria-haspopup="menu"
               aria-expanded={menuOpen}
-              aria-label="更多"
-              title={props.host ? `更多 · ${props.host}` : "更多"}
+              aria-label={tr("更多", "More")}
+              title={props.host ? tr(`更多 · ${props.host}`, `More · ${props.host}`) : tr("更多", "More")}
               onClick={(event) => {
                 // The bar scrolls, so the menu is placed on the page beside the button rather than inside the bar.
                 const box = event.currentTarget.getBoundingClientRect();
@@ -602,15 +606,15 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
               <div
                 className="foot-menu bar-menu"
                 role="menu"
-                aria-label="本机"
+                aria-label={tr("本机", "This computer")}
                 style={menuAt ?? undefined}
               >
                 <div
                   className="bar-menu-host"
-                  title={props.host ? `这台计算机：${props.host}` : undefined}
+                  title={props.host ? tr(`这台计算机：${props.host}`, `This computer: ${props.host}`) : undefined}
                 >
                   <ComputerIcon />
-                  <span className="host-name">{props.host || "本机"}</span>
+                  <span className="host-name">{props.host || tr("本机", "This computer")}</span>
                 </div>
                 <button
                   type="button"
@@ -622,7 +626,7 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
                   }}
                 >
                   <GearIcon />
-                  <span>设置</span>
+                  <span>{tr("设置", "Settings")}</span>
                 </button>
                 {props.onLogout && (
                   <button
@@ -635,7 +639,7 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
                     }}
                   >
                     <LeaveIcon />
-                    <span>退出登录</span>
+                    <span>{tr("退出登录", "Sign out")}</span>
                   </button>
                 )}
               </div>
@@ -648,7 +652,7 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
           {props.mobile ? (
             // The tab bar says which screen this is; the name stays for screen readers only.
             <h1 className="visually-hidden">
-              {running ? "工作台" : pinnedView ? "钉住" : "会话"}
+              {running ? tr("工作台", "Home") : pinnedView ? tr("钉住", "Pinned") : tr("会话", "Chats")}
             </h1>
           ) : (
             <div className="brand">
@@ -657,7 +661,7 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
               <button
                 type="button"
                 className="icon-button rail-dismiss"
-                aria-label="收起会话列表"
+                aria-label={tr("收起会话列表", "Collapse the list")}
                 onClick={props.onDismiss}
               >
                 <CloseIcon />
@@ -668,7 +672,7 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
             !running &&
             (props.tools.length > 0 || pinnedView) && (
               // One chip per AI tool, scrolled sideways when they do not fit; the chosen one is filled in.
-              <div className="tool-tabs" role="tablist" aria-label="会话">
+              <div className="tool-tabs" role="tablist" aria-label={tr("会话", "Chats")}>
                 <button
                   type="button"
                   role="tab"
@@ -678,7 +682,7 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
                   onClick={props.onPinned}
                 >
                   <PushpinIcon size={16} filled={pinnedView} />
-                  <span>钉住</span>
+                  <span>{tr("钉住", "Pinned")}</span>
                 </button>
                 {props.tools.map((item) => {
                   const off = props.offlineTools.includes(item);
@@ -698,7 +702,7 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
                       disabled={off}
                       title={
                         off
-                          ? `${toolName[item]} 的客户端没有在本机开启`
+                          ? tr(`${toolName[item]} 的客户端没有在本机开启`, `${toolName[item]}'s app is not open on this computer`)
                           : used != null
                             ? quota?.title
                             : toolName[item]
@@ -717,12 +721,12 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
         <div className="rail-list">
           {offline && (
             <p className="rail-note is-warning">
-              连不上本机服务。确认 MirrorMix 进程还在运行，列表会自动恢复。
+              {tr("连不上本机服务。确认 MirrorMix 进程还在运行，列表会自动恢复。", "Cannot reach the local service. Check that MirrorMix is still running; the list recovers by itself.")}
             </p>
           )}
           {!offline && !blocked && catalog === null && (
             <div className="rail-loading" role="status">
-              <span className="visually-hidden">正在读取会话列表</span>
+              <span className="visually-hidden">{tr("正在读取会话列表", "Loading conversations")}</span>
               {[72, 54, 86, 61, 78].map((width, index) => (
                 <span
                   className="bone"
@@ -734,25 +738,24 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
           )}
           {unchosen && (
             <p className="rail-note">
-              还没有选择要显示的 AI 工具。
+              {tr("还没有选择要显示的 AI 工具。", "No AI tool is chosen to show yet. ")}
               <button
                 type="button"
                 className="link-button"
                 onClick={props.onSettings}
               >
-                到设置里选择
+                {tr("到设置里选择", "Choose in Settings")}
               </button>
             </p>
           )}
           {down && (
             <p className="rail-note is-warning">
-              {toolName[tool]}{" "}
-              的客户端没有在本机开启。打开它之后，这里会自动恢复。
+              {tr(`${toolName[tool]} 的客户端没有在本机开启。打开它之后，这里会自动恢复。`, `${toolName[tool]}'s app is not open on this computer. This recovers once you open it.`)}
             </p>
           )}
           {running && !offline && !unchosen && catalog === null && (
             <div className="rail-loading" role="status">
-              <span className="visually-hidden">正在读取运行中的任务</span>
+              <span className="visually-hidden">{tr("正在读取运行中的任务", "Loading running tasks")}</span>
               {[72, 54, 86].map((width, index) => (
                 <span
                   className="bone"
@@ -768,7 +771,7 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
             catalog &&
             usableTools.length === 0 && (
               <p className="rail-note is-warning">
-                选中的 AI 工具都没有在本机开启。打开其中一个，这里会自动恢复。
+                {tr("选中的 AI 工具都没有在本机开启。打开其中一个，这里会自动恢复。", "None of the chosen AI tools is open on this computer. Open one and this recovers by itself.")}
               </p>
             )}
           {running && props.mobile && !offline && props.today}
@@ -872,14 +875,14 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
                         ))}
                       </ul>
                     ) : (
-                      <p className="workspace-count">没有运行中的任务</p>
+                      <p className="workspace-count">{tr("没有运行中的任务", "Nothing running")}</p>
                     ))}
                 </section>
               );
             })}
           {pinnedView && !offline && !unchosen && catalog === null && (
             <div className="rail-loading" role="status">
-              <span className="visually-hidden">正在读取钉住的会话</span>
+              <span className="visually-hidden">{tr("正在读取钉住的会话", "Loading pinned conversations")}</span>
               {[72, 54, 86].map((width, index) => (
                 <span
                   className="bone"
@@ -891,7 +894,7 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
           )}
           {pinnedView && !offline && catalog && myPins.length === 0 && (
             <p className="rail-note">
-              还没有钉住的会话。打开一条会话，点右上角的钉，它就会出现在这里。
+              {tr("还没有钉住的会话。打开一条会话，点右上角的钉，它就会出现在这里。", "No pinned conversations yet. Open one and click the pin at the top right, and it shows up here.")}
             </p>
           )}
           {pinnedView && !offline && myPins.length > 0 && (
@@ -952,14 +955,13 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
           )}
           {!offline && !blocked && catalog && groups.length === 0 && (
             <p className="rail-note">
-              {toolName[tool]}{" "}
-              还没有会话。先在终端里用它开一条，这里就会出现它的工作区。
+              {tr(`${toolName[tool]} 还没有会话。先在终端里用它开一条，这里就会出现它的工作区。`, `${toolName[tool]} has no conversations yet. Start one in a terminal and its workspace shows up here.`)}
             </p>
           )}
           {!offline && !blocked && pinnedRows.length > 0 && (
             <section className="workspace pinned-group">
               <div className="workspace-head project-section-head">
-                <h2 className="workspace-name plain">置顶</h2>
+                <h2 className="workspace-name plain">{tr("置顶", "Pinned")}</h2>
                 {pinnedQuota?.percent != null && (
                   <PinnedQuota quota={pinnedQuota} />
                 )}
@@ -1018,16 +1020,16 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
                   {group.label ? null : group.missing ? (
                     <span
                       className="workspace-flag"
-                      title="这个目录已经不在磁盘上，里面的会话只能查看"
+                      title={tr("这个目录已经不在磁盘上，里面的会话只能查看", "This folder is no longer on disk, so its conversations are view only")}
                     >
-                      目录不在
+                      {tr("目录不在", "Folder gone")}
                     </span>
                   ) : props.canCreate === false ? null : (
                     <button
                       type="button"
                       className="icon-button new-session"
-                      aria-label={`在 ${name} 里新建会话`}
-                      title="在这个工作区新建会话"
+                      aria-label={tr(`在 ${name} 里新建会话`, `New conversation in ${name}`)}
+                      title={tr("在这个工作区新建会话", "New conversation in this workspace")}
                       disabled={creatingPath !== null}
                       onClick={() => props.onCreate(group)}
                     >
@@ -1039,7 +1041,7 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
                   <>
                     <ul>{visible.map(row)}</ul>
                     {group.sessions.length === 0 && (
-                      <p className="workspace-count">无任务</p>
+                      <p className="workspace-count">{tr("无任务", "No tasks")}</p>
                     )}
                     {hidden > 0 && (
                       <button
@@ -1051,14 +1053,14 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
                           )
                         }
                       >
-                        显示其余 {hidden} 条
+                        {tr(`显示其余 ${hidden} 条`, `Show ${hidden} more`)}
                       </button>
                     )}
                   </>
                 )}
                 {closed && (
                   <p className="workspace-count">
-                    {group.sessions.length} 条会话
+                    {tr(`${group.sessions.length} 条会话`, `${group.sessions.length} conversations`)}
                   </p>
                 )}
               </section>
@@ -1069,3 +1071,8 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
     </aside>
   );
 });
+
+/** A quota window's name as the server writes it ("5小时", "本周"), in the interface language. */
+function quotaWords(window: string): string {
+  return tr(window, window.replace("5小时", "5h").replace("本周", "Week").replace("已满", "full"));
+}

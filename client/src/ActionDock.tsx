@@ -3,6 +3,7 @@ import type { ToolId } from "./api";
 import { CloseIcon, ConsoleIcon, FolderIcon } from "./icons";
 import { PreviewButton } from "./PreviewButton";
 
+import { tr } from "./i18n";
 /**
  * The session's tools (command line, files, browser preview), floating at the right edge of the conversation.
  * Folded into one round button by default; pressing it unfolds the three upward.
@@ -49,19 +50,19 @@ export function ActionDock({
   // Another session starts folded.
   useEffect(() => setOpen(false), [tool, id]);
 
-  const noFolder = "这条会话没有工作目录";
+  const noFolder = tr("这条会话没有工作目录", "This conversation has no working folder");
   const anyOpen = cmdOpen || filesOpen;
 
   return (
     <div className={open ? "dock is-open" : "dock"} ref={box}>
       {open && (
-        <div className="dock-items" role="group" aria-label="会话工具">
+        <div className="dock-items" role="group" aria-label={tr("会话工具", "Conversation tools")}>
           <button
             type="button"
             className={cmdOpen ? "dock-item is-on" : "dock-item"}
-            aria-label={cmdOpen ? "收起命令行" : "打开命令行"}
+            aria-label={cmdOpen ? tr("收起命令行", "Hide the terminal") : tr("打开命令行", "Open the terminal")}
             aria-pressed={cmdOpen}
-            title={workspacePath ? `命令行：${workspacePath}` : noFolder}
+            title={workspacePath ? tr(`命令行：${workspacePath}`, `Terminal: ${workspacePath}`) : noFolder}
             disabled={!workspacePath}
             onClick={onCmd}
           >
@@ -70,9 +71,9 @@ export function ActionDock({
           <button
             type="button"
             className={filesOpen ? "dock-item is-on" : "dock-item"}
-            aria-label={filesOpen ? "关闭资源管理器" : "打开资源管理器"}
+            aria-label={filesOpen ? tr("关闭资源管理器", "Close files") : tr("打开资源管理器", "Open files")}
             aria-pressed={filesOpen}
-            title={workspacePath ? `资源管理器：${workspacePath}` : noFolder}
+            title={workspacePath ? tr(`资源管理器：${workspacePath}`, `Files: ${workspacePath}`) : noFolder}
             disabled={!workspacePath}
             onClick={onFiles}
           >
@@ -89,8 +90,8 @@ export function ActionDock({
         type="button"
         className="dock-toggle"
         aria-expanded={open}
-        aria-label={open ? "收起会话工具" : "展开会话工具：命令行、资源管理器、浏览器"}
-        title={open ? "收起" : "命令行、资源管理器、浏览器"}
+        aria-label={open ? tr("收起会话工具", "Hide conversation tools") : tr("展开会话工具：命令行、资源管理器、浏览器", "Show conversation tools: terminal, files, browser")}
+        title={open ? tr("收起", "Hide") : tr("命令行、资源管理器、浏览器", "Terminal, files, browser")}
         onClick={() => setOpen((value) => !value)}
       >
         {open ? (

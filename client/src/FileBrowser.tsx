@@ -6,6 +6,7 @@ import { api, type FolderEntry, type ToolId } from "./api";
 import { AddToBrowserDialog, ListAddIcon } from "./AddToBrowser";
 import { BackIcon, ChevronIcon, CloseIcon, CollapseIcon, DownloadIcon, FileIcon, FolderIcon, GlobeIcon, RefreshIcon, SearchIcon, Spinner } from "./icons";
 
+import { tr, uiLocale } from "./i18n";
 const IMAGE = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif", ".ico", ".svg", ".bmp"]);
 const VIDEO = new Set([".mp4", ".webm"]);
 const AUDIO = new Set([".mp3", ".wav", ".ogg"]);
@@ -61,19 +62,19 @@ function parentOf(dir: string): string {
 
 function sizeText(entry: FolderEntry): string {
   if (entry.dir) return "";
-  if (entry.size < 1024) return `${entry.size} 字节`;
+  if (entry.size < 1024) return tr(`${entry.size} 字节`, `${entry.size} bytes`);
   const kb = Math.ceil(entry.size / 1024);
-  return kb < 10_240 ? `${kb.toLocaleString("zh-CN")} KB` : `${(entry.size / 1024 / 1024).toFixed(1)} MB`;
+  return kb < 10_240 ? `${kb.toLocaleString(uiLocale())} KB` : `${(entry.size / 1024 / 1024).toFixed(1)} MB`;
 }
 
 function typeText(entry: FolderEntry): string {
-  if (entry.dir) return "文件夹";
+  if (entry.dir) return tr("文件夹", "Folder");
   const ext = extOf(entry.name);
-  return ext ? `${ext.slice(1).toUpperCase()} 文件` : "文件";
+  return ext ? tr(`${ext.slice(1).toUpperCase()} 文件`, `${ext.slice(1).toUpperCase()} file`) : tr("文件", "File");
 }
 
 function dateText(ms: number): string {
-  return new Date(ms).toLocaleString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+  return new Date(ms).toLocaleString(uiLocale(), { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
 /** What the preview pane shows for one file. */
@@ -147,9 +148,9 @@ function FilePreview({
   else if (AUDIO.has(ext)) body = <audio className="file-audio" src={url} controls />;
   else if (ext === ".pdf") body = <iframe className="file-frame" src={url} title={entry.name} />;
   else if (problem === "binary" || (!showText && !(unknown && entry.size <= MAX_TEXT)))
-    body = <p className="file-note">{entry.size > MAX_TEXT && textual ? "文件太大，不在这里显示。可以下载后查看。" : "这种文件没法在这里预览，可以下载后打开。"}</p>;
-  else if (problem === "failed") body = <p className="file-note">没有读到这个文件，它可能刚被移走或改名了。</p>;
-  else if (text === null) body = <p className="file-note"><Spinner /> 正在读取…</p>;
+    body = <p className="file-note">{entry.size > MAX_TEXT && textual ? tr("文件太大，不在这里显示。可以下载后查看。", "The file is too large to show here. Download it to view.") : tr("这种文件没法在这里预览，可以下载后打开。", "This kind of file cannot be previewed here. Download it to open.")}</p>;
+  else if (problem === "failed") body = <p className="file-note">{tr("没有读到这个文件，它可能刚被移走或改名了。", "Could not read this file; it may have just been moved or renamed.")}</p>;
+  else if (text === null) body = <p className="file-note"><Spinner /> {tr("正在读取…", "Loading…")}</p>;
   else if (MARKDOWN.has(ext)) body = <div className="file-markdown markdown"><ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown></div>;
   else {
     const lines = text.split(/\r?\n/);
@@ -169,10 +170,10 @@ function FilePreview({
   }
 
   return (
-    <section className={phone ? "file-preview is-overlay" : "file-preview"} aria-label={`预览 ${entry.name}`}>
+    <section className={phone ? "file-preview is-overlay" : "file-preview"} aria-label={tr(`预览 ${entry.name}`, `Preview ${entry.name}`)}>
       <header className="file-preview-head">
         {onBack && (
-          <button type="button" className="icon-button" aria-label="返回文件列表" onClick={onBack}>
+          <button type="button" className="icon-button" aria-label={tr("返回文件列表", "Back to files")} onClick={onBack}>
             <BackIcon />
           </button>
         )}
@@ -180,39 +181,39 @@ function FilePreview({
           <strong title={path}>{entry.name}</strong>
           {phone ? (
             // The folder it is in matters more on a phone than the type: the tree is out of sight.
-            <span>{[parentOf(path) || "根目录", sizeText(entry)].join(" · ")}</span>
+            <span>{[parentOf(path) || tr("根目录", "Root"), sizeText(entry)].join(" · ")}</span>
           ) : (
             <span>{typeText(entry)} · {sizeText(entry)} · {dateText(entry.mtime)}</span>
           )}
         </div>
         {(HTML.has(ext) || MARKDOWN.has(ext)) &&
           (phone ? (
-            <button type="button" className="icon-button" disabled={opening} onClick={() => void openPage()} aria-label="当网页打开" title="当网页打开">
+            <button type="button" className="icon-button" disabled={opening} onClick={() => void openPage()} aria-label={tr("当网页打开", "Open as a web page")} title={tr("当网页打开", "Open as a web page")}>
               <GlobeIcon />
             </button>
           ) : (
-            <button type="button" className="quiet-button" disabled={opening} onClick={() => void openPage()} title="在新标签页里当网页打开">
+            <button type="button" className="quiet-button" disabled={opening} onClick={() => void openPage()} title={tr("在新标签页里当网页打开", "Open as a web page in a new tab")}>
               <GlobeIcon />
-              <span>当网页打开</span>
+              <span>{tr("当网页打开", "Open as a web page")}</span>
             </button>
           ))}
         {(HTML.has(ext) || MARKDOWN.has(ext)) && (
           <button
             type="button"
             className="icon-button"
-            aria-label={`把 ${entry.name} 加入浏览器列表`}
-            title="加入悬浮操作里浏览器的文件列表"
+            aria-label={tr(`把 ${entry.name} 加入浏览器列表`, `Add ${entry.name} to the browser list`)}
+            title={tr("加入悬浮操作里浏览器的文件列表", "Add to the browser file list in the floating tools")}
             onClick={() => setAdding(true)}
           >
             <ListAddIcon />
           </button>
         )}
-        <a className="icon-button" href={api.fileUrl(tool, id, path, true)} aria-label={`下载 ${entry.name}`} title="下载">
+        <a className="icon-button" href={api.fileUrl(tool, id, path, true)} aria-label={tr(`下载 ${entry.name}`, `Download ${entry.name}`)} title={tr("下载", "Download")}>
           <DownloadIcon />
         </a>
       </header>
       {adding && <AddToBrowserDialog tool={tool} id={id} path={path} name={entry.name} onClose={() => setAdding(false)} />}
-      {problem === "page" && <p className="file-note">网页没有打开。回到这里再试一次。</p>}
+      {problem === "page" && <p className="file-note">{tr("网页没有打开。回到这里再试一次。", "The page did not open. Come back here and try again.")}</p>}
       <div className="file-preview-body">{body}</div>
     </section>
   );
@@ -321,7 +322,7 @@ export function FileBrowser({
     if (!reveal) return;
     const relative = insideFolder(reveal.path, cwd);
     if (relative === null || !relative) {
-      setRevealNote(`“${reveal.path}”不在这个会话的文件夹里。`);
+      setRevealNote(tr(`“${reveal.path}”不在这个会话的文件夹里。`, `"${reveal.path}" is not in this conversation's folder.`));
       return;
     }
     let live = true;
@@ -338,7 +339,7 @@ export function FileBrowser({
         try {
           entries = (await api.files(tool, id, dir)).entries;
         } catch {
-          if (live) setRevealNote(`没找到 ${relative}，它可能已经被移走或改名。`);
+          if (live) setRevealNote(tr(`没找到 ${relative}，它可能已经被移走或改名。`, `${relative} was not found; it may have been moved or renamed.`));
           return;
         }
         if (!live) return;
@@ -348,7 +349,7 @@ export function FileBrowser({
         const found = entries.find((entry) => entry.name === name) ?? entries.find((entry) => entry.name.toLowerCase() === name.toLowerCase());
         const last = index === parts.length - 1;
         if (!found || (!last && !found.dir)) {
-          setRevealNote(`没找到 ${relative}，它可能已经被移走或改名。`);
+          setRevealNote(tr(`没找到 ${relative}，它可能已经被移走或改名。`, `${relative} was not found; it may have been moved or renamed.`));
           return;
         }
         const path = dir ? `${dir}/${found.name}` : found.name;
@@ -410,8 +411,8 @@ export function FileBrowser({
       | { kind: "note"; path: string; text: string; depth: number };
     const walk = (dir: string, depth: number): { rows: Row[]; matched: boolean } => {
       const listed = folders[dir];
-      if (listed === undefined || listed === "loading") return { rows: [{ kind: "note", path: `${dir}#`, text: "正在读取…", depth }], matched: false };
-      if (listed === "error") return { rows: [{ kind: "note", path: `${dir}#`, text: "打不开这个文件夹", depth }], matched: false };
+      if (listed === undefined || listed === "loading") return { rows: [{ kind: "note", path: `${dir}#`, text: tr("正在读取…", "Loading…"), depth }], matched: false };
+      if (listed === "error") return { rows: [{ kind: "note", path: `${dir}#`, text: tr("打不开这个文件夹", "Cannot open this folder"), depth }], matched: false };
       const out: Row[] = [];
       let matched = false;
       for (const entry of listed) {
@@ -420,7 +421,7 @@ export function FileBrowser({
         const inner = entry.dir && expanded.has(path) ? walk(path, depth + 1) : null;
         if (hit || inner?.matched) {
           out.push({ kind: "entry", path, entry, depth });
-          if (inner) out.push(...(inner.rows.length ? inner.rows : [{ kind: "note" as const, path: `${path}#`, text: "空文件夹", depth: depth + 1 }]));
+          if (inner) out.push(...(inner.rows.length ? inner.rows : [{ kind: "note" as const, path: `${path}#`, text: tr("空文件夹", "Empty folder"), depth: depth + 1 }]));
           matched = true;
         }
       }
@@ -470,7 +471,7 @@ export function FileBrowser({
   const rootListing = folders[""];
 
   return (
-    <section className={mobile ? "files-box is-sheet" : "files-box"} aria-label="资源管理器">
+    <section className={mobile ? "files-box is-sheet" : "files-box"} aria-label={tr("资源管理器", "Files")}>
       {mobile ? (
         // While a file is open its own header (back, name, download) is the only bar: the preview gets the screen.
         !previewing && (
@@ -478,12 +479,12 @@ export function FileBrowser({
           <div className="files-mbar">
             <div className="files-mtitle" title={cwd}>
               <strong>{rootName}</strong>
-              <span>{Array.isArray(rootListing) ? `${rootListing.length} 个项目` : "正在读取…"}</span>
+              <span>{Array.isArray(rootListing) ? tr(`${rootListing.length} 个项目`, `${rootListing.length} items`) : tr("正在读取…", "Loading…")}</span>
             </div>
             <button
               type="button"
               className={searching || filter ? "icon-button is-on" : "icon-button"}
-              aria-label="筛选"
+              aria-label={tr("筛选", "Filter")}
               aria-pressed={searching || Boolean(filter)}
               onClick={() => {
                 if (searching && filter) setFilter("");
@@ -492,13 +493,13 @@ export function FileBrowser({
             >
               <SearchIcon />
             </button>
-            <button type="button" className="icon-button" aria-label="全部折叠" disabled={expanded.size === 0} onClick={() => setExpanded(new Set())}>
+            <button type="button" className="icon-button" aria-label={tr("全部折叠", "Collapse all")} disabled={expanded.size === 0} onClick={() => setExpanded(new Set())}>
               <CollapseIcon />
             </button>
-            <button type="button" className="icon-button" aria-label="刷新" onClick={refresh}>
+            <button type="button" className="icon-button" aria-label={tr("刷新", "Refresh")} onClick={refresh}>
               <RefreshIcon />
             </button>
-            <button type="button" className="icon-button" aria-label="关闭资源管理器" onClick={onClose}>
+            <button type="button" className="icon-button" aria-label={tr("关闭资源管理器", "Close files")} onClick={onClose}>
               <CloseIcon />
             </button>
           </div>
@@ -507,8 +508,8 @@ export function FileBrowser({
               <input
                 className="files-filter"
                 type="search"
-                placeholder="筛选已展开的文件"
-                aria-label="筛选文件"
+                placeholder={tr("筛选已展开的文件", "Filter the expanded files")}
+                aria-label={tr("筛选文件", "Filter files")}
                 value={filter}
                 autoFocus
                 enterKeyHint="search"
@@ -530,14 +531,14 @@ export function FileBrowser({
             </span>
           )}
         </div>
-        <button type="button" className="icon-button" aria-label="刷新" title="刷新" onClick={refresh}>
+        <button type="button" className="icon-button" aria-label={tr("刷新", "Refresh")} title={tr("刷新", "Refresh")} onClick={refresh}>
           <RefreshIcon />
         </button>
         <button
           type="button"
           className="icon-button"
-          aria-label="全部折叠"
-          title="全部折叠"
+          aria-label={tr("全部折叠", "Collapse all")}
+          title={tr("全部折叠", "Collapse all")}
           disabled={expanded.size === 0}
           onClick={() => setExpanded(new Set())}
         >
@@ -547,13 +548,13 @@ export function FileBrowser({
           <input
             className="files-filter"
             type="search"
-            placeholder="筛选已展开的文件"
-            aria-label="筛选文件"
+            placeholder={tr("筛选已展开的文件", "Filter the expanded files")}
+            aria-label={tr("筛选文件", "Filter files")}
             value={filter}
             onChange={(event) => setFilter(event.target.value)}
           />
         )}
-        <button type="button" className="icon-button" aria-label="关闭资源管理器" title="关闭" onClick={onClose}>
+        <button type="button" className="icon-button" aria-label={tr("关闭资源管理器", "Close files")} title={tr("关闭", "Close")} onClick={onClose}>
           <CloseIcon />
         </button>
       </div>
@@ -564,7 +565,7 @@ export function FileBrowser({
         <div
           className="files-list ftree"
           role="tree"
-          aria-label="文件"
+          aria-label={tr("文件", "Files")}
           tabIndex={0}
           ref={treeRef}
           onKeyDown={onTreeKey}
@@ -572,8 +573,8 @@ export function FileBrowser({
           style={mobile ? undefined : { width: listWidth, flex: "none" }}
         >
             {revealNote && <p className="file-note is-warning">{revealNote}</p>}
-            {rootListing === "error" && <p className="file-note">这个文件夹打不开了，它可能已经被移走或改名。</p>}
-            {Array.isArray(rootListing) && rows.length === 0 && <p className="file-note">{filter ? "没有符合的项目" : "此文件夹为空"}</p>}
+            {rootListing === "error" && <p className="file-note">{tr("这个文件夹打不开了，它可能已经被移走或改名。", "This folder cannot be opened; it may have been moved or renamed.")}</p>}
+            {Array.isArray(rootListing) && rows.length === 0 && <p className="file-note">{filter ? tr("没有符合的项目", "Nothing matches") : tr("此文件夹为空", "This folder is empty")}</p>}
             {rows.map((row) =>
               row.kind === "note" ? (
                 <p key={row.path} className="ftree-note" style={{ paddingLeft: (mobile ? 34 : 28) + row.depth * (mobile ? 14 : 16) }}>
@@ -589,7 +590,7 @@ export function FileBrowser({
                   aria-selected={selected?.path === row.path}
                   className={selected?.path === row.path ? "ftree-item is-selected" : "ftree-item"}
                   style={{ paddingLeft: (mobile ? 8 : 6) + row.depth * (mobile ? 14 : 16) }}
-                  title={`${row.entry.name}\n${typeText(row.entry)}${row.entry.dir ? "" : ` · ${sizeText(row.entry)}`}\n修改于 ${dateText(row.entry.mtime)}`}
+                  title={`${row.entry.name}\n${typeText(row.entry)}${row.entry.dir ? "" : ` · ${sizeText(row.entry)}`}\n${tr("修改于", "Modified")} ${dateText(row.entry.mtime)}`}
                   onClick={() => choose(row.path, row.entry)}
                 >
                   <span className={row.entry.dir && expanded.has(row.path) ? "ftree-caret is-open" : "ftree-caret"} aria-hidden="true">
@@ -608,11 +609,11 @@ export function FileBrowser({
             className="files-splitter"
             role="separator"
             aria-orientation="vertical"
-            aria-label="调整文件列表宽度"
+            aria-label={tr("调整文件列表宽度", "Resize the file list")}
             aria-valuenow={listWidth}
             aria-valuemin={LIST_MIN}
             tabIndex={0}
-            title="拖动调整宽度，双击恢复默认"
+            title={tr("拖动调整宽度，双击恢复默认", "Drag to resize; double-click to reset")}
             onPointerDown={startDrag}
             onKeyDown={nudgeWidth}
             onDoubleClick={() => {
@@ -635,7 +636,7 @@ export function FileBrowser({
             onBack={mobile ? () => setShownFile(null) : undefined}
           />
         ) : (
-          !mobile && <p className="file-preview file-note is-empty">选择要预览的文件</p>
+          !mobile && <p className="file-preview file-note is-empty">{tr("选择要预览的文件", "Choose a file to preview")}</p>
         )}
       </div>
     </section>

@@ -1,15 +1,16 @@
 import { useCallback, useState } from "react";
+import { tr } from "./i18n";
 
 /** How the page looks: follow the system, or always light or dark. Kept per browser, so a phone and a computer can differ. */
 export type Theme = "system" | "light" | "dark";
 
 export const THEME_KEY = "mirrormix.theme";
 
-export const THEME_LABEL: Record<Theme, string> = {
-  system: "跟随系统",
-  light: "浅色",
-  dark: "深色",
-};
+export const THEME_LABEL = (): Record<Theme, string> => ({
+  system: tr("跟随系统", "System"),
+  light: tr("浅色", "Light"),
+  dark: tr("深色", "Dark"),
+});
 
 /** The browser bar's colour on a phone: the list's background in each look. */
 const BAR_COLOR = { light: "#e4ebee", dark: "#13171e" };

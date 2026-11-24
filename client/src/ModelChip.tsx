@@ -3,20 +3,47 @@ import type { ToolId } from "./api";
 import { Spinner } from "./icons";
 import { modelFamily, modelName } from "./modelName";
 
+import { tr } from "./i18n";
 /** What Claude Code's `/model` takes. "default" goes back to what the account would pick. */
 const CLAUDE_CHOICES: Array<{ alias: string; label: string; note: string }> = [
-  { alias: "opus", label: "Opus", note: "最强，适合难题" },
-  { alias: "sonnet", label: "Sonnet", note: "又快又好，日常主力" },
-  { alias: "haiku", label: "Haiku", note: "最快、最省" },
-  { alias: "default", label: "默认", note: "按账号的默认设置" },
+  {
+    alias: "opus",
+    label: "Opus",
+    get note() {
+      return tr("最强，适合难题", "Most capable, for hard problems");
+    },
+  },
+  {
+    alias: "sonnet",
+    label: "Sonnet",
+    get note() {
+      return tr("又快又好，日常主力", "Fast and strong, for everyday work");
+    },
+  },
+  {
+    alias: "haiku",
+    label: "Haiku",
+    get note() {
+      return tr("最快、最省", "Fastest and cheapest");
+    },
+  },
+  {
+    alias: "default",
+    get label() {
+      return tr("默认", "Default");
+    },
+    get note() {
+      return tr("按账号的默认设置", "What the account would pick");
+    },
+  },
 ];
 
-const WHERE: Record<ToolId, string> = {
-  claude: "在 Claude 桌面端的输入框旁边切换",
-  codex: "在 Codex 里用 /model 切换",
-  cursor: "在 Cursor 的输入框下方切换",
-  deepseek: "在 DSH 的模型设置里切换",
-};
+const WHERE = (): Record<ToolId, string> => ({
+  claude: tr("在 Claude 桌面端的输入框旁边切换", "Switch it next to the input box in the Claude desktop app"),
+  codex: tr("在 Codex 里用 /model 切换", "Switch it with /model in Codex"),
+  cursor: tr("在 Cursor 的输入框下方切换", "Switch it under Cursor's input box"),
+  deepseek: tr("在 DSH 的模型设置里切换", "Switch it in DSH's model settings"),
+});
 
 interface Props {
   tool: ToolId;
@@ -70,7 +97,7 @@ export function ModelChip({ tool, model, effort, canSwitch, busy, onSwitch }: Pr
 
   if (!model && !canSwitch) return null;
 
-  const name = model ? modelName(model) : "模型";
+  const name = model ? modelName(model) : tr("模型", "Model");
   const label = name;
   const current = model ? modelFamily(model) : "";
 
@@ -93,7 +120,7 @@ export function ModelChip({ tool, model, effort, canSwitch, busy, onSwitch }: Pr
 
   if (!canSwitch) {
     return (
-      <span className="model-chip is-static" title={model ? `${model}${effort ? `，推理强度 ${effort}` : ""}。${WHERE[tool]}` : undefined}>
+      <span className="model-chip is-static" title={model ? tr(`${model}${effort ? `，推理强度 ${effort}` : ""}。${WHERE()[tool]}`, `${model}${effort ? `, reasoning effort ${effort}` : ""}. ${WHERE()[tool]}`) : undefined}>
         {label}
       </span>
     );
@@ -106,19 +133,19 @@ export function ModelChip({ tool, model, effort, canSwitch, busy, onSwitch }: Pr
         className={open ? "model-chip is-on" : "model-chip"}
         aria-haspopup="menu"
         aria-expanded={open}
-        title={model ? `当前模型 ${model}。点击切换` : "切换模型"}
+        title={model ? tr(`当前模型 ${model}。点击切换`, `Current model ${model}. Click to switch`) : tr("切换模型", "Switch model")}
         onClick={() => setOpen((value) => !value)}
       >
         {asked ? <Spinner /> : null}
-        {asked ? `切换到 ${asked.alias}` : label}
+        {asked ? tr(`切换到 ${asked.alias}`, `Switching to ${asked.alias}`) : label}
         <span className="model-caret" aria-hidden="true">▾</span>
       </button>
       {open && (
         <div className="model-menu" role="menu">
           <div className="preview-head">
-            <span>切换模型</span>
+            <span>{tr("切换模型", "Switch model")}</span>
           </div>
-          {busy && <p className="preview-hint">正在回复中。新模型从下一轮回复开始用。</p>}
+          {busy && <p className="preview-hint">{tr("正在回复中。新模型从下一轮回复开始用。", "Replying now. The new model is used from the next reply.")}</p>}
           <ul className="model-list">
             {CLAUDE_CHOICES.map((choice) => (
               <li key={choice.alias}>
@@ -145,15 +172,15 @@ export function ModelChip({ tool, model, effort, canSwitch, busy, onSwitch }: Pr
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.nativeEvent.isComposing) submitCustom(event);
               }}
-              placeholder="其他模型 ID，如 claude-opus-5-5"
-              aria-label="模型 ID"
+              placeholder={tr("其他模型 ID，如 claude-opus-5-5", "Another model ID, e.g. claude-opus-5-5")}
+              aria-label={tr("模型 ID", "Model ID")}
               spellCheck={false}
             />
             <button type="button" className="quiet-button" disabled={!custom.trim() || /\s/.test(custom.trim()) || sending !== null} onClick={submitCustom}>
-              切换
+              {tr("切换", "Switch")}
             </button>
           </div>
-          <p className="preview-hint model-foot">发送的是 /model 命令，对这条会话之后的回复生效。</p>
+          <p className="preview-hint model-foot">{tr("发送的是 /model 命令，对这条会话之后的回复生效。", "This sends a /model command; it applies to this conversation's later replies.")}</p>
         </div>
       )}
     </div>

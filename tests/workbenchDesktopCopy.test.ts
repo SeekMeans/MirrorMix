@@ -8,8 +8,8 @@ describe("desktop workbench copy", () => {
   it("calls the desktop home entry 工作台 and leaves out the running-task explainer", () => {
     const sidebar = read("Sidebar.tsx");
     const app = read("App.tsx");
-    expect(sidebar).toContain('<span className="bar-label">工作台</span>');
-    expect(sidebar).toContain('aria-label={`工作台，${busyCount} 个运行中或有新回复的会话`}');
+    expect(sidebar).toContain('<span className="bar-label">{tr("工作台", "Home")}</span>');
+    expect(sidebar).toContain('aria-label={tr(`工作台，${busyCount} 个运行中或有新回复的会话`, `Home, ${busyCount} conversations running or with new replies`)}');
     expect(app).not.toContain("运行中的任务");
     expect(app).not.toContain("左侧按 AI 工具列出了正在回复的会话");
   });

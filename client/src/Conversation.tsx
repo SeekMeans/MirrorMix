@@ -3,7 +3,12 @@ import type { TranscriptMessage } from "./api";
 import { CloseIcon, DownIcon, FileIcon, ImageIcon, PlusIcon, SendIcon, Spinner } from "./icons";
 import { api, type SlashCommand } from "./api";
 
-const SOURCE_LABEL: Record<SlashCommand["source"], string> = { builtin: "内置", user: "我的", project: "项目", skill: "技能" };
+const SOURCE_LABEL = (): Record<SlashCommand["source"], string> => ({
+  builtin: tr("内置", "Built-in"),
+  user: tr("我的", "Mine"),
+  project: tr("项目", "Project"),
+  skill: tr("技能", "Skill"),
+});
 
 /** The "/" menu's entries for what has been typed after the slash: names starting with it first, then containing it. */
 function matchCommands(commands: SlashCommand[], query: string): SlashCommand[] {
@@ -23,9 +28,11 @@ import { CursorThread } from "./CursorThread";
 import { FlavorContext, RoundRow, StepRow, ThinkingRow, useMarks } from "./Transcript";
 import { PAGE, type SessionHandle, type SessionState } from "./useSession";
 
+import { tr, useLanguage } from "./i18n";
 const LONG_USER_TEXT = 1500;
 
 const MessageRow = memo(function MessageRow({ message }: { message: TranscriptMessage }) {
+  useLanguage();
   const [expanded, setExpanded] = useState(false);
   const marks = useMarks();
   if (message.role === "step") return <StepRow step={message} />;
@@ -46,11 +53,11 @@ const MessageRow = memo(function MessageRow({ message }: { message: TranscriptMe
     <article className={pending ? "message user pending" : "message user"}>
       <span className="cc-prompt" aria-hidden="true">{marks.prompt}</span>
       <div className="user-copy">
-        {pending && <span className="queue-mark">{queued ? "排队" : "等待送达"}</span>}
+        {pending && <span className="queue-mark">{queued ? tr("排队", "Queued") : tr("等待送达", "Sending")}</span>}
         {long && !expanded ? `${message.text.slice(0, LONG_USER_TEXT)}…` : message.text}
         {long && (
           <button type="button" className="link-button unfold" onClick={() => setExpanded((open) => !open)}>
-            {expanded ? "收起" : `展开全文（${message.text.length} 字）`}
+            {expanded ? tr("收起", "Show less") : tr(`展开全文（${message.text.length} 字）`, `Show all (${message.text.length} characters)`)}
           </button>
         )}
       </div>
@@ -129,6 +136,7 @@ function blocksOf(messages: TranscriptMessage[]): Block[] {
 
 const StepGroup = memo(
   function StepGroup({ items }: { items: TranscriptMessage[] }) {
+    useLanguage();
     const [open, setOpen] = useState(false);
     const running = items.filter((item) => item.role === "step" && item.result?.status === "running");
     const failed = items.some((item) => item.result?.status === "error");
@@ -169,7 +177,7 @@ const StepGroup = memo(
 function Skeleton() {
   return (
     <div className="skeleton" role="status">
-      <span className="visually-hidden">正在读取会话</span>
+      <span className="visually-hidden">{tr("正在读取会话", "Loading the conversation")}</span>
       <span className="bone right" style={{ width: "38%" }} />
       <span className="bone" style={{ width: "92%" }} />
       <span className="bone" style={{ width: "84%" }} />
@@ -264,7 +272,7 @@ export function MessageList({ session, state }: { session: SessionHandle; state:
         <div className="column" ref={column}>
           {state.phase === "loading" && <Skeleton />}
           {state.phase === "missing" && (
-            <p className="blank">这条会话已经不在了。它可能被归档或删除，从左侧换一条。</p>
+            <p className="blank">{tr("这条会话已经不在了。它可能被归档或删除，从左侧换一条。", "This conversation is gone. It may have been archived or deleted; pick another on the left.")}</p>
           )}
           {state.phase === "ready" && (
             <>
@@ -272,22 +280,22 @@ export function MessageList({ session, state }: { session: SessionHandle; state:
                 {state.offset > 0 && state.older === "loading" && (
                   <span className="older-status" role="status">
                     <Spinner />
-                    正在读取更早的 {olderCount} 条
+                    {tr(`正在读取更早的 ${olderCount} 条`, `Loading ${olderCount} earlier messages`)}
                   </span>
                 )}
                 {state.offset > 0 && state.older === "idle" && (
                   <button type="button" className="link-button" onClick={loadOlder}>
-                    读取更早的 {olderCount} 条（前面还有 {state.offset} 条）
+                    {tr(`读取更早的 ${olderCount} 条（前面还有 ${state.offset} 条）`, `Load ${olderCount} earlier messages (${state.offset} before them)`)}
                   </button>
                 )}
                 {state.offset > 0 && state.older === "failed" && (
                   <button type="button" className="link-button is-warning" onClick={loadOlder}>
-                    更早的消息没有读到，再试一次
+                    {tr("更早的消息没有读到，再试一次", "Earlier messages did not load; try again")}
                   </button>
                 )}
-                {state.offset === 0 && state.total > 0 && <span className="older-status">会话从这里开始</span>}
+                {state.offset === 0 && state.total > 0 && <span className="older-status">{tr("会话从这里开始", "The conversation starts here")}</span>}
               </div>
-              {state.total === 0 && <p className="blank">这条会话还没有消息。在下面写第一句话。</p>}
+              {state.total === 0 && <p className="blank">{tr("这条会话还没有消息。在下面写第一句话。", "No messages yet. Write the first one below.")}</p>}
               {state.meta?.tool === "cursor" ? (
                 <CursorThread messages={state.messages} />
               ) : (
@@ -309,7 +317,7 @@ export function MessageList({ session, state }: { session: SessionHandle; state:
       {away && state.phase === "ready" && (
         <button type="button" className="jump" onClick={jump}>
           <DownIcon />
-          回到最新
+          {tr("回到最新", "Back to latest")}
         </button>
       )}
     </div>
@@ -333,17 +341,17 @@ interface Attachment {
 const attached = new Map<string, Attachment[]>();
 let attachmentSeq = 0;
 
-const UPLOAD_ERRORS: Record<string, string> = {
-  too_large: "超过 30 MB",
-  empty_file: "是空文件",
-};
+const UPLOAD_ERRORS = (): Record<string, string> => ({
+  too_large: tr("超过 30 MB", "over 30 MB"),
+  empty_file: tr("是空文件", "the file is empty"),
+});
 
 /** The message as sent: the words, then each attachment's full path on a line, so the AI opens them itself. */
 export function withAttachments(text: string, paths: Array<{ path: string; image: boolean }>): string {
   if (!paths.length) return text;
-  const lines = paths.map((item) => `${item.image ? "[图片]" : "[文件]"} ${item.path}`).join("\n");
+  const lines = paths.map((item) => `${item.image ? tr("[图片]", "[Image]") : tr("[文件]", "[File]")} ${item.path}`).join("\n");
   const words = text.trim();
-  return words ? `${words}\n\n附件：\n${lines}` : `请查看附件：\n${lines}`;
+  return words ? tr(`${words}\n\n附件：\n${lines}`, `${words}\n\nAttachments:\n${lines}`) : tr(`请查看附件：\n${lines}`, `Please look at the attachments:\n${lines}`);
 }
 
 /** A pasted picture has no name of its own; it gets one from the time it was pasted. */
@@ -352,7 +360,7 @@ function pastedName(file: File): string {
   const now = new Date();
   const stamp = [now.getHours(), now.getMinutes(), now.getSeconds()].map((part) => String(part).padStart(2, "0")).join("");
   const extension = (file.type.split("/")[1] || "png").replace("jpeg", "jpg").replace(/[^a-z0-9]/gi, "");
-  return `粘贴图片-${stamp}.${extension}`;
+  return tr(`粘贴图片-${stamp}.${extension}`, `pasted-image-${stamp}.${extension}`);
 }
 
 /** Mount with `key={session key}` so each session keeps its own unsent text. */
@@ -488,7 +496,7 @@ export function Composer({
         )
         .catch((error: { code?: string }) =>
           setAttachments((current) =>
-            current.map((item) => (item.key === key ? { ...item, status: "error", error: UPLOAD_ERRORS[error.code ?? ""] ?? "上传失败" } : item)),
+            current.map((item) => (item.key === key ? { ...item, status: "error", error: UPLOAD_ERRORS()[error.code ?? ""] ?? tr("上传失败", "Upload failed") } : item)),
           ),
         );
     }
@@ -591,7 +599,7 @@ export function Composer({
                 <p>{text}</p>
                 {onSendNow && (
                   <button type="button" className="queue-now" disabled={sendingNow === text} onClick={() => void sendNow(text)}>
-                    立即发送
+                    {tr("立即发送", "Send now")}
                   </button>
                 )}
               </li>
@@ -600,11 +608,11 @@ export function Composer({
         </section>
       )}
       {menuOpen && (
-        <div className="slash-menu" role="listbox" aria-label="斜杠命令">
+        <div className="slash-menu" role="listbox" aria-label={tr("斜杠命令", "Slash commands")}>
           {commands === null ? (
-            <p className="slash-note">正在读取命令…</p>
+            <p className="slash-note">{tr("正在读取命令…", "Loading commands…")}</p>
           ) : matches.length === 0 ? (
-            <p className="slash-note">没有以“/{slash![1]}”开头的命令，回车会照原样发送</p>
+            <p className="slash-note">{tr(`没有以“/${slash![1]}”开头的命令，回车会照原样发送`, `No command starts with "/${slash![1]}"; Enter sends it as written`)}</p>
           ) : (
             <ul ref={menuRef}>
               {matches.map((command, index) => (
@@ -621,7 +629,7 @@ export function Composer({
                   >
                     <span className="slash-name">/{command.name}</span>
                     <span className="slash-desc">{command.description}</span>
-                    <span className="slash-source">{SOURCE_LABEL[command.source]}</span>
+                    <span className="slash-source">{SOURCE_LABEL()[command.source]}</span>
                   </button>
                 </li>
               ))}
@@ -654,12 +662,12 @@ export function Composer({
         }}
       >
         {attachments.length > 0 && (
-          <ul className="attachments" aria-label="附件">
+          <ul className="attachments" aria-label={tr("附件", "Attachments")}>
             {attachments.map((item) => (
               <li
                 key={item.key}
                 className={`attachment is-${item.status}${item.preview ? " has-preview" : ""}`}
-                title={item.error ? `${item.name}：${item.error}` : item.path ?? item.name}
+                title={item.error ? tr(`${item.name}：${item.error}`, `${item.name}: ${item.error}`) : item.path ?? item.name}
               >
                 {item.preview ? (
                   <img src={item.preview} alt={item.name} />
@@ -675,7 +683,7 @@ export function Composer({
                   </span>
                 )}
                 {item.status === "error" && <span className="attachment-error">{item.error}</span>}
-                <button type="button" className="attachment-remove" aria-label={`移除 ${item.name}`} onClick={() => removeAttachment(item.key)}>
+                <button type="button" className="attachment-remove" aria-label={tr(`移除 ${item.name}`, `Remove ${item.name}`)} onClick={() => removeAttachment(item.key)}>
                   <CloseIcon />
                 </button>
               </li>
@@ -687,7 +695,7 @@ export function Composer({
           rows={1}
           value={draft}
           placeholder={(sending || busy) && respondingPlaceholder ? respondingPlaceholder : placeholder}
-          aria-label="消息"
+          aria-label={tr("消息", "Message")}
           disabled={!enabled}
           enterKeyHint={mobile ? "enter" : "send"}
           onChange={(event) => change(event.target.value)}
@@ -731,10 +739,10 @@ export function Composer({
             <button
               type="button"
               className={addOpen ? "add-button active" : "add-button"}
-              aria-label="添加文件或图片"
+              aria-label={tr("添加文件或图片", "Add files or images")}
               aria-haspopup="menu"
               aria-expanded={addOpen}
-              title="添加文件或图片，也可以直接粘贴或拖进来"
+              title={tr("添加文件或图片，也可以直接粘贴或拖进来", "Add files or images; you can also paste or drag them in")}
               disabled={!enabled}
               onClick={() => setAddOpen((value) => !value)}
             >
@@ -751,7 +759,7 @@ export function Composer({
                   }}
                 >
                   <FileIcon />
-                  <span>添加文件</span>
+                  <span>{tr("添加文件", "Add files")}</span>
                 </button>
                 <button
                   type="button"
@@ -762,9 +770,9 @@ export function Composer({
                   }}
                 >
                   <ImageIcon />
-                  <span>添加图片</span>
+                  <span>{tr("添加图片", "Add images")}</span>
                 </button>
-                <p className="add-hint">也可以粘贴截图，或把文件拖进输入框</p>
+                <p className="add-hint">{tr("也可以粘贴截图，或把文件拖进输入框", "You can also paste a screenshot or drag files into the box")}</p>
               </div>
             )}
             <input
@@ -791,14 +799,14 @@ export function Composer({
           </div>
           {open && tools && <div className="composer-tools">{tools}</div>}
           {busy && onStop && (
-            <button type="button" className="stop-reply" disabled={stopping} aria-label="终止回复" title="终止正在进行的回复" onClick={onStop}>
+            <button type="button" className="stop-reply" disabled={stopping} aria-label={tr("终止回复", "Stop the reply")} title={tr("终止正在进行的回复", "Stop the reply in progress")} onClick={onStop}>
               {stopping ? <Spinner /> : <span className="stop-square" aria-hidden="true" />}
-              <span>{stopping ? "正在终止" : "终止"}</span>
+              <span>{stopping ? tr("正在终止", "Stopping") : tr("终止", "Stop")}</span>
             </button>
           )}
           <button type="submit" className="send" disabled={!canSend}>
             <SendIcon />
-            <span>发送</span>
+            <span>{tr("发送", "Send")}</span>
           </button>
         </div>
       </div>
