@@ -7,6 +7,8 @@ export interface ToolPrefs {
   tools: ToolId[];
   /** Sessions pinned inside MirrorMix (`tool:id`); the tools' own pins are separate and never changed. */
   pinned?: string[];
+  /** An explicit interface-language choice. Without one, the browser decides. */
+  language?: "zh-CN" | "en";
   status: Record<ToolId, { running: boolean }>;
   /** This computer's name. */
   host: string;
@@ -325,7 +327,7 @@ async function settings(): Promise<ToolPrefs> {
   return keepPrefs(await response.text());
 }
 
-async function saveSettings(change: { tools: ToolId[] } | { pinned: string[] }): Promise<ToolPrefs> {
+async function saveSettings(change: { tools: ToolId[] } | { pinned: string[] } | { language: "zh-CN" | "en" }): Promise<ToolPrefs> {
   const response = await authenticatedFetch("/api/settings", {
     method: "PUT",
     headers: { "content-type": "application/json" },

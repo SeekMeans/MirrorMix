@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -26,6 +26,17 @@ const claudeCli = proc(`${win("C:", "Users", "me", "AppData", "Local", "Claude-D
 const codexCli = proc(`node.exe ${win("C:", "nvm4w", "nodejs", "node_modules", "@openai", "codex", "bin", "codex.js")} resume abc`);
 
 describe("tool settings", () => {
+  it("preserves legacy settings and saves only supported interface languages", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "aimiss-language-"));
+    const file = path.join(root, "settings.json");
+    writeFileSync(file, JSON.stringify({ tools: ["codex"] }));
+    const settings = createSettingsStore(file, () => []);
+
+    expect(settings.read()).toMatchObject({ tools: ["codex"], pinned: [], language: undefined });
+    expect(settings.write({ language: "en" })).toMatchObject({ tools: ["codex"], language: "en" });
+    expect(() => settings.write({ language: "fr" })).toThrow("bad_request");
+  });
+
   it("counts a tool as open only when its desktop app is running", () => {
     expect(detectTools([claudeCli, codexCli, deepseekHelper, deepseekCli])).toEqual({ claude: { running: false }, codex: { running: false }, cursor: { running: false }, deepseek: { running: false } });
     expect(detectTools([claudeApp, codexCli, cursorApp, deepseekApp])).toEqual({ claude: { running: true }, codex: { running: false }, cursor: { running: true }, deepseek: { running: true } });
@@ -60,6 +71,10 @@ describe("tool settings", () => {
       const saved = await fetch(`${base}/api/settings`, { method: "PUT", headers: json, body: JSON.stringify({ tools: ["cursor", "codex", "nope"] }) });
       expect((await saved.json()).tools).toEqual(["codex", "cursor"]);
       expect(settings.read().tools).toEqual(["codex", "cursor"]);
+      const language = await fetch(`${base}/api/settings`, { method: "PUT", headers: json, body: JSON.stringify({ language: "en" }) });
+      expect((await language.json()).language).toBe("en");
+      expect(settings.read().language).toBe("en");
+      expect((await fetch(`${base}/api/settings`, { method: "PUT", headers: json, body: JSON.stringify({ language: "fr" }) })).status).toBe(400);
       expect((await fetch(`${base}/api/settings`, { method: "PUT", headers: json, body: JSON.stringify({}) })).status).toBe(400);
 
       const open = (tool: string) =>

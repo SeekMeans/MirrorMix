@@ -4,6 +4,7 @@ import type { ProcessInfo } from "../process/occupancy";
 import type { ToolId } from "../shared/types";
 
 export const ALL_TOOLS: ToolId[] = ["claude", "codex", "cursor", "deepseek"];
+export type Language = "zh-CN" | "en";
 
 /**
  * The desktop app of each tool, as it appears on a process command line.
@@ -41,6 +42,8 @@ export interface ToolSettings {
   tools: ToolId[];
   /** Sessions pinned in MirrorMix itself (`tool:id`). Kept apart from the tools' own pins, which are never touched. */
   pinned: string[];
+  /** Interface language; omitted until the person makes an explicit choice. */
+  language?: Language;
 }
 
 function cleanPinned(value: unknown): string[] | null {
@@ -52,6 +55,10 @@ function cleanPinned(value: unknown): string[] | null {
 function clean(value: unknown): ToolId[] | null {
   if (!Array.isArray(value)) return null;
   return ALL_TOOLS.filter((tool) => value.includes(tool));
+}
+
+function cleanLanguage(value: unknown): Language | null {
+  return value === "zh-CN" || value === "en" ? value : null;
 }
 
 export interface SettingsStore {
@@ -80,12 +87,13 @@ function cleanPlugins(value: unknown): string[] | null {
 export function createSettingsStore(file: string, listProcesses: () => ProcessInfo[]): SettingsStore {
   const read = (): ToolSettings => {
     try {
-      const data = JSON.parse(readFileSync(file, "utf8")) as { tools?: unknown; pinned?: unknown };
-      return { tools: clean(data.tools) ?? [...ALL_TOOLS], pinned: cleanPinned(data.pinned) ?? [] };
+      const data = JSON.parse(readFileSync(file, "utf8")) as { tools?: unknown; pinned?: unknown; language?: unknown };
+      const language = data.language === undefined ? undefined : cleanLanguage(data.language);
+      return { tools: clean(data.tools) ?? [...ALL_TOOLS], pinned: cleanPinned(data.pinned) ?? [], language: language ?? undefined };
     } catch {
       /* no file yet, or one that cannot be read: everything is shown */
     }
-    return { tools: [...ALL_TOOLS], pinned: [] };
+    return { tools: [...ALL_TOOLS], pinned: [], language: undefined };
   };
   const status = () => detectTools(listProcesses());
   const pluginFile = path.join(path.dirname(file), "plugins.json");
@@ -107,15 +115,16 @@ export function createSettingsStore(file: string, listProcesses: () => ProcessIn
     },
     read,
     write(value) {
-      const input = (value ?? {}) as { tools?: unknown; pinned?: unknown };
+      const input = (value ?? {}) as { tools?: unknown; pinned?: unknown; language?: unknown };
       const tools = input.tools === undefined ? null : clean(input.tools);
       const pinned = input.pinned === undefined ? null : cleanPinned(input.pinned);
+      const language = input.language === undefined ? null : cleanLanguage(input.language);
       // Either part may be saved alone; a part that is present but malformed is refused.
-      if ((input.tools !== undefined && !tools) || (input.pinned !== undefined && !pinned) || (!tools && !pinned)) {
+      if ((input.tools !== undefined && !tools) || (input.pinned !== undefined && !pinned) || (input.language !== undefined && !language) || (!tools && !pinned && !language)) {
         throw new Error("bad_request");
       }
       const current = read();
-      const next = { tools: tools ?? current.tools, pinned: pinned ?? current.pinned };
+      const next = { tools: tools ?? current.tools, pinned: pinned ?? current.pinned, language: language ?? current.language };
       if (!existsSync(path.dirname(file))) mkdirSync(path.dirname(file), { recursive: true });
       writeFileSync(file, `${JSON.stringify(next, null, 2)}
 `);
