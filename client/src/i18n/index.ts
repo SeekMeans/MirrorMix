@@ -10,6 +10,10 @@ export function browserLanguage(value = typeof navigator === "undefined" ? "" : 
   return value.toLowerCase().startsWith("zh") ? "zh-CN" : "en";
 }
 
+export function resolveLanguage(saved: UiLanguage | undefined, detected: UiLanguage): UiLanguage {
+  return saved ?? detected;
+}
+
 void i18n.use(initReactI18next).init({
   resources: { en: { translation: en }, "zh-CN": { translation: zhCN } },
   lng: browserLanguage(),

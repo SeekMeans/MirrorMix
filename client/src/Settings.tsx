@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { ALL_TOOLS, type ToolId, type ToolPrefs } from "./api";
 import { HelpContent } from "./Help";
 import { ModelManager } from "./Models";
@@ -93,9 +94,11 @@ export function SettingsDialog({
   /** Opened straight at this section (a computer) or page (a phone), e.g. the plugin market from 我的插件. */
   startAt?: Section | MenuPage;
   onToggle: (tool: ToolId, shown: boolean) => void;
+  onLanguageChange: (language: "zh-CN" | "en") => void;
   onCheck: () => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const closeButton = useRef<HTMLButtonElement>(null);
   const [theme, setTheme] = useTheme();
   const [section, setSection] = useState<Section>(startAt === "market" || startAt === "help" ? startAt : "general");
@@ -216,6 +219,19 @@ export function SettingsDialog({
   );
 
   const appearance = (
+    <>
+    <div className="setting">
+      <div className="setting-label">
+        <h3>{t("settings.language")}</h3>
+        <p>{t("settings.languageHint")}</p>
+      </div>
+      <div className="setting-control">
+        <select value={prefs?.language ?? (navigator.language.toLowerCase().startsWith("zh") ? "zh-CN" : "en")} onChange={(event) => onLanguageChange(event.target.value as "zh-CN" | "en")}>
+          <option value="zh-CN">{t("common.chinese")}</option>
+          <option value="en">{t("common.english")}</option>
+        </select>
+      </div>
+    </div>
     <div className="setting">
       <div className="setting-label">
         <h3>外观</h3>
@@ -238,6 +254,7 @@ export function SettingsDialog({
         </div>
       </div>
     </div>
+    </>
   );
 
   const remote = (

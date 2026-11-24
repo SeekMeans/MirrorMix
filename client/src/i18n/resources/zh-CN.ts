@@ -6,6 +6,10 @@ const zhCN = {
     saveFailed: "设置没有保存，请再试一次。",
     unknownError: "请求没有完成，请检查 MirrorMix 是否仍在运行。",
   },
+  settings: {
+    language: "语言",
+    languageHint: "选择 MirrorMix 界面的显示语言。",
+  },
 } as const;
 
 export default zhCN;

@@ -22,6 +22,7 @@ import { errorText, oneLine, toolName } from "./text";
 import { useFinished } from "./useFinished";
 import { useMobile } from "./useMobile";
 import { useSession, type SessionState } from "./useSession";
+import { browserLanguage, i18n, resolveLanguage, setLanguage } from "./i18n";
 
 /** On a phone one screen shows at a time. The conversation is pushed on top of the list and has no tab bar. */
 type Screen = "list" | "chat" | "plugins" | "settings" | "workflows";
@@ -169,6 +170,24 @@ export function App({ onLogout }: { onLogout?: () => void }) {
       return true;
     } catch {
       return false;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!prefs) return;
+    const next = resolveLanguage(prefs.language, browserLanguage());
+    if (i18n.language !== next) void setLanguage(next);
+  }, [prefs]);
+
+  const changeLanguage = useCallback(async (language: "zh-CN" | "en") => {
+    const before = i18n.language as "zh-CN" | "en";
+    await setLanguage(language);
+    try {
+      setPrefs(await api.saveSettings({ language }));
+      setSettingsError("");
+    } catch {
+      await setLanguage(before);
+      setSettingsError("设置没有保存，请再试一次。");
     }
   }, []);
 
@@ -982,6 +1001,7 @@ export function App({ onLogout }: { onLogout?: () => void }) {
           onPlugin={(id, add) => void changePlugin(id, add)}
           startAt={settingsStart}
           onToggle={toggleTool}
+          onLanguageChange={(language) => void changeLanguage(language)}
           onCheck={() => void checkNow()}
           onClose={() => setScreen("list")}
         />
@@ -1041,6 +1061,7 @@ export function App({ onLogout }: { onLogout?: () => void }) {
           onPlugin={(id, add) => void changePlugin(id, add)}
           startAt={settingsStart}
           onToggle={toggleTool}
+          onLanguageChange={(language) => void changeLanguage(language)}
           onCheck={() => void checkNow()}
           onClose={closeSettings}
         />
