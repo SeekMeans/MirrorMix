@@ -38,6 +38,12 @@ describe("settings", () => {
     expect(settings("page")).not.toContain("选择要显示的 AI 工具");
   });
 
+  it("offers both interface languages directly on a phone", () => {
+    const page = settings("page");
+    expect(page).toContain("中文");
+    expect(page).toContain("英文");
+  });
+
   it("does not offer the plugin market on a desktop", () => {
     expect(settings("dialog")).not.toContain("插件市场");
     expect(settings("dialog")).not.toContain("通过你的服务器");

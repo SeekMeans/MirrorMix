@@ -219,6 +219,15 @@ export function SettingsDialog({
     </>
   );
 
+  const languageChoice = (
+    <div className="theme-choice language-choice" role="radiogroup" aria-label={t("settings.language")}>
+      {(["zh-CN", "en"] as const).map((language) => {
+        const selected = activeLanguage(i18n.resolvedLanguage ?? i18n.language) === language;
+        return <button key={language} type="button" role="radio" aria-checked={selected} className={selected ? "active" : ""} onClick={() => onLanguageChange(language)}>{language === "zh-CN" ? t("common.chinese") : t("common.english")}</button>;
+      })}
+    </div>
+  );
+
   const appearance = (
     <>
     <div className="setting">
@@ -227,12 +236,7 @@ export function SettingsDialog({
         <p>{t("settings.languageHint")}</p>
       </div>
       <div className="setting-control">
-        <div className="theme-choice language-choice" role="radiogroup" aria-label={t("settings.language")}>
-          {(["zh-CN", "en"] as const).map((language) => {
-            const selected = activeLanguage(i18n.resolvedLanguage ?? i18n.language) === language;
-            return <button key={language} type="button" role="radio" aria-checked={selected} className={selected ? "active" : ""} onClick={() => onLanguageChange(language)}>{language === "zh-CN" ? t("common.chinese") : t("common.english")}</button>;
-          })}
-        </div>
+        {languageChoice}
       </div>
     </div>
     <div className="setting">
@@ -349,6 +353,10 @@ export function SettingsDialog({
           </section>
 
           <div className="pref-group">
+            <div className="pref-row is-static">
+              <span className="pref-title">{t("settings.language")}</span>
+              <span className="pref-segment">{languageChoice}</span>
+            </div>
             <button type="button" className="pref-row" onClick={() => openSub("tools")}>
               <span className="pref-title">AI 工具</span>
               <span className="pref-marks" aria-label={summary.tools}>
