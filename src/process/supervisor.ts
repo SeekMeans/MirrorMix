@@ -194,12 +194,12 @@ export interface SupervisorOptions {
   pollMs?: number;
   /** Desktop deployments must never silently launch a separate CLI conversation. */
   desktopOnly?: boolean;
-  submitCodex?: (title: string, text: string, sessionId: string) => Promise<void>;
+  submitCodex?: (title: string, text: string, sessionId: string, replaceDraft?: boolean) => Promise<void>;
   codexReceiptMs?: number;
   codexDesktopSession?: (sessionId: string) => { title: string } | null;
   findClaudeInbox?: (sessionId: string, skipPids: number[]) => ClaudeInbox | null;
   injectClaude?: (inbox: ClaudeInbox, text: string) => Promise<void>;
-  submitDesktop?: (title: string, text: string) => Promise<void>;
+  submitDesktop?: (title: string, text: string, replaceDraft?: boolean) => Promise<void>;
   /** Whether the Claude Code that MirrorMix starts can be signed in now (the desktop app's sign-in can be found). */
   claudeSignedIn?: () => boolean;
   /** Sessions taken off the list without touching their files (the ones an app keeps). */
@@ -338,7 +338,8 @@ export interface Supervisor {
   open(tool: ToolId, id: string): SessionView;
   create(tool: ToolId, workspacePath: string): Promise<SessionView>;
   close(tool: ToolId, id: string): SessionView;
-  send(tool: ToolId, id: string, text: string): Promise<void>;
+  /** `replaceDraft`: the sender chose to send over a draft in the desktop app's input box. */
+  send(tool: ToolId, id: string, text: string, options?: { replaceDraft?: boolean }): Promise<void>;
   sendNow(tool: ToolId, id: string, text: string): Promise<void>;
   /** Stops the reply under way, the way the person would in the tool itself. */
   interrupt(tool: ToolId, id: string): Promise<void>;
@@ -994,7 +995,7 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
     return viewOf(runtime);
   };
 
-  const send = async (tool: ToolId, id: string, text: string) => {
+  const send = async (tool: ToolId, id: string, text: string, sendOptions: { replaceDraft?: boolean } = {}) => {
     if (!text.trim() || text.length > MAX_TEXT) throw new ApiError(400, "bad_request");
     let runtime = runtimeFor(tool, id);
     // A session taken over here keeps its own process; going back to the window would drop it.
@@ -1211,7 +1212,7 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
         if (tool === "codex" && options.submitCodex) {
           runtime.codexSending = true;
           const copies = runtime.echoSeen ?? 0;
-          await options.submitCodex(title, text, runtime.id);
+          await options.submitCodex(title, text, runtime.id, ...(sendOptions.replaceDraft ? [true] : []));
           if (desktopHistory && !inTurn) {
             const deadline = Date.now() + (options.codexReceiptMs ?? ECHO_GRACE_MS);
             const sent = sameWords(text);
@@ -1225,7 +1226,7 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
               await pause(Math.min(pollMs, left));
             }
           }
-        } else if (options.submitDesktop) await options.submitDesktop(title, text);
+        } else if (options.submitDesktop) await options.submitDesktop(title, text, ...(sendOptions.replaceDraft ? [true] : []));
         else await (options.injectClaude ?? injectClaudeInbox)(runtime.inbox, text);
       } catch (error) {
         if (error instanceof ApiError) {

@@ -454,8 +454,8 @@ export const api = {
   /** "trash": the files went to the Recycle Bin. "hidden": an app keeps the session, so it only left this list. */
   deleteSession: (tool: ToolId, id: string) =>
     request<{ removed: "trash" | "hidden" }>("/api/sessions/delete", { method: "POST", body: JSON.stringify({ tool, id }) }),
-  send: (tool: ToolId, id: string, text: string) =>
-    request<{ ok: true }>("/api/sessions/send", { method: "POST", body: JSON.stringify({ tool, id, text }) }),
+  send: (tool: ToolId, id: string, text: string, replaceDraft = false) =>
+    request<{ ok: true }>("/api/sessions/send", { method: "POST", body: JSON.stringify({ tool, id, text, ...(replaceDraft ? { replaceDraft: true } : {}) }) }),
   previewPorts: () => request<{ ports: ListeningPort[] }>("/api/preview/ports"),
   files: (tool: ToolId, id: string, dir: string) =>
     request<{ root: string; dir: string; entries: FolderEntry[]; truncated: boolean }>(

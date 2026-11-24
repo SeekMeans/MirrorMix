@@ -167,7 +167,7 @@ const supervisor = createSupervisor({
   // Sessions created from the page; only these show a delete button.
   madeHere: createHiddenSessions(path.join(home, ".mirrormix", "created-sessions.json")),
   trash: moveToRecycleBin,
-  submitDesktop: (title, text) => desktop.submit(title, text),
+  submitDesktop: (title, text, replaceDraft) => desktop.submit(title, text, undefined, replaceDraft),
   claudeSignedIn: () => claudeHostSignedIn(),
   stopDesktop: (title) => desktop.stop(title),
   stopCodex: (title, id) => codexDesktop.stop(title, id),
@@ -177,7 +177,7 @@ const supervisor = createSupervisor({
   findClaudeInbox: (id, skipPids) => claudeInboxForSession(id, skipPids, Date.now(), claudeHostSession(roots.claudeDataDir, id) ?? ""),
   // A Codex thread open in the Codex app gets its messages there; without the app (or while the screen is locked)
   // MirrorMix's own Codex takes them, except in desktop-only mode, which never starts one.
-  submitCodex: (title, text, id) => codexDesktop.submit(title, text, id),
+  submitCodex: (title, text, id, replaceDraft) => codexDesktop.submit(title, text, id, replaceDraft),
   // Outside desktop-only mode a thread counts as the app's only while the app is open; otherwise MirrorMix runs it.
   codexDesktopSession: (id) =>
     desktopOnly || detectTools(listProcesses()).codex.running ? codexDesktopSession(roots.codexSessionsDir, id) : null,

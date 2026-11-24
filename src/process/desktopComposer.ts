@@ -99,7 +99,7 @@ export function createDesktopComposer(tool: "claude" | "codex" = "claude", usage
     });
   };
 
-  const request = (op: "send" | "stream" | "usage" | "create" | "stop" | "prompt" | "answer" | "dump", title: string, text = "", threadId = "") => {
+  const request = (op: "send" | "stream" | "usage" | "create" | "stop" | "prompt" | "answer" | "dump", title: string, text = "", threadId = "", replace = false) => {
     const run = chain.then(
       () =>
         new Promise<ComposerResponse>((resolve, reject) => {
@@ -135,6 +135,7 @@ export function createDesktopComposer(tool: "claude" | "codex" = "claude", usage
               id,
               op,
               ...(threadId ? { threadId } : {}),
+              ...(replace ? { replace: true } : {}),
               title: Buffer.from(title, "utf8").toString("base64"),
               text: Buffer.from(text, "utf8").toString("base64"),
             })}\n`,
@@ -164,11 +165,12 @@ export function createDesktopComposer(tool: "claude" | "codex" = "claude", usage
       console.warn(`[${tool} window] could not start a session in "${folder}": ${response.error || "failed"}${detail ? ` (${detail})` : ""}`);
       throw new Error(response.error || "failed");
     },
-    async submit(title: string, text: string, threadId?: string) {
+    /** `replaceDraft`: a draft in the box gives way to this message instead of stopping it. */
+    async submit(title: string, text: string, threadId?: string, replaceDraft = false) {
       sending += 1;
       let response: ComposerResponse;
       try {
-        response = await request("send", title, text, threadId);
+        response = await request("send", title, text, threadId, replaceDraft);
       } finally {
         sending -= 1;
       }

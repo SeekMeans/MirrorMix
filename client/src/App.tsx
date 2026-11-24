@@ -540,14 +540,24 @@ export function App({ onLogout }: { onLogout?: () => void }) {
     }
   }
 
-  async function send(text: string): Promise<boolean> {
+  async function send(text: string, replaceDraft = false): Promise<boolean> {
     if (!meta) return false;
     try {
-      await api.send(meta.tool, meta.id, text);
+      await api.send(meta.tool, meta.id, text, replaceDraft);
       setNotice("");
       return true;
     } catch (error) {
       const code = (error as { code?: string }).code;
+      // Someone left words in the desktop app's box. From a phone there is no way to clear them by hand, so ask.
+      if (code === "desktop_draft" && !replaceDraft) {
+        const ok = window.confirm(
+          tr(
+            "电脑上的输入框里还有没发出去的文字。\n\n用这条消息替换它并发送吗？原来的文字会被清掉。",
+            "The input box on the computer still has unsent words.\n\nReplace them with this message and send? The words there will be cleared.",
+          ),
+        );
+        if (ok) return send(text, true);
+      }
       if (code === "not_idle") {
         setNotice(meta.attached === "claude" ? tr("Claude 正在回复，等这一轮结束再发。", "Claude is replying. Send once this turn ends.") : tr("消息没有发出。这一轮还没结束，等它完成再发。", "The message was not sent. This turn has not ended; send once it finishes."));
       } else {

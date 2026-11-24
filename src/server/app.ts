@@ -711,11 +711,11 @@ export function createApp(
         return sendJson(response, 200, windowOf(await supervisor.answerPrompt(tool, body.id, body.promptId, body.optionId)));
       }
       if (request.method === "POST" && url.pathname === "/api/sessions/send") {
-        const body = await readJson<{ tool: string; id: string; text: string }>(request);
+        const body = await readJson<{ tool: string; id: string; text: string; replaceDraft?: unknown }>(request);
         const tool = asTool(body.tool);
         if (!tool) return sendJson(response, 400, { error: "bad_request" });
         requireUsable(tool);
-        await supervisor.send(tool, body.id, body.text);
+        await supervisor.send(tool, body.id, body.text, body.replaceDraft === true ? { replaceDraft: true } : undefined);
         return sendJson(response, 200, { ok: true });
       }
       if (request.method === "POST" && url.pathname === "/api/sessions/send-now") {

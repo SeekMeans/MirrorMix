@@ -224,6 +224,22 @@ function Has-Draft([string]$text, [string]$placeholder) {
   return [bool]($text.Trim() -and $text.Trim() -ne $placeholder.Trim())
 }
 
+# What this helper typed into input boxes lately. Clearing the box after a send that did not go through does not always
+# take in the app's editor, and such words are ours, not the person's draft: they are replaced, not refused.
+$script:typed = New-Object System.Collections.Generic.List[string]
+function Same-Words([string]$text) { return (($text -replace '\s+', ' ').Trim()) }
+function Remember-Typed([string]$text) {
+  $words = Same-Words $text
+  if (-not $words) { return }
+  [void]$script:typed.Remove($words)
+  $script:typed.Add($words)
+  while ($script:typed.Count -gt 20) { $script:typed.RemoveAt(0) }
+}
+function Typed-Here([string]$draft, [string]$text) {
+  $words = Same-Words $draft
+  return [bool]($words -and ($words -eq (Same-Words $text) -or $script:typed.Contains($words)))
+}
+
 function Find-SessionItem($win, [string]$title) {
   $items = $win.FindAll(
     [System.Windows.Automation.TreeScope]::Descendants,
@@ -605,9 +621,17 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
     $text = Decode $req.text
     $draft = $value.Current.Value
     if (Has-Draft $draft $prompt.Current.Name) {
-      Emit $false "draft" ("active=" + (Get-ActiveTitle $win) + "; prompt=" + $prompt.Current.Name + "; length=" + $draft.Length)
-      continue
+      if (Typed-Here $draft $text) {
+        Log-Send ("replaced words left in the box by an earlier send (length=" + $draft.Length + ")")
+      } elseif ($req.replace) {
+        # The person chose, from where they are, to send anyway; the draft gives way to their message.
+        Log-Send ("replaced a draft at the sender's request (length=" + $draft.Length + ")")
+      } else {
+        Emit $false "draft" ("active=" + (Get-ActiveTitle $win) + "; prompt=" + $prompt.Current.Name + "; length=" + $draft.Length)
+        continue
+      }
     }
+    Remember-Typed $text
     $value.SetValue($text)
     Give-Front
     # Until the click lands, the words are ours to take back out if anything goes wrong.
