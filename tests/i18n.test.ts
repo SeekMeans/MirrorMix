@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { browserLanguage, resolveLanguage } from "../client/src/i18n";
+import { browserLanguage, i18n, resolveLanguage, setLanguage } from "../client/src/i18n";
 
 describe("interface language", () => {
   it("uses Chinese for every zh browser locale", () => {
@@ -15,5 +15,12 @@ describe("interface language", () => {
   it("prefers an explicit setting over the browser locale", () => {
     expect(resolveLanguage("en", "zh-CN")).toBe("en");
     expect(resolveLanguage(undefined, "zh-CN")).toBe("zh-CN");
+  });
+
+  it("changes the visible settings copy with the selected language", async () => {
+    await setLanguage("en");
+    expect(i18n.t("settings.generalTitle")).toBe("General settings");
+    await setLanguage("zh-CN");
+    expect(i18n.t("settings.generalTitle")).toBe("通用设置");
   });
 });

@@ -9,6 +9,8 @@ const zhCN = {
   settings: {
     language: "语言",
     languageHint: "选择 MirrorMix 界面的显示语言。",
+    generalTitle: "通用设置",
+    generalLead: "选择要显示的 AI 工具，查看它们在本机是否开启，选择浅色或深色，设置外网访问。",
   },
 } as const;
 

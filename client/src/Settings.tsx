@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import "./i18n";
 import { ALL_TOOLS, type ToolId, type ToolPrefs } from "./api";
 import { HelpContent } from "./Help";
 import { ModelManager } from "./Models";
@@ -226,10 +227,12 @@ export function SettingsDialog({
         <p>{t("settings.languageHint")}</p>
       </div>
       <div className="setting-control">
-        <select value={prefs?.language ?? (navigator.language.toLowerCase().startsWith("zh") ? "zh-CN" : "en")} onChange={(event) => onLanguageChange(event.target.value as "zh-CN" | "en")}>
-          <option value="zh-CN">{t("common.chinese")}</option>
-          <option value="en">{t("common.english")}</option>
-        </select>
+        <div className="theme-choice language-choice" role="radiogroup" aria-label={t("settings.language")}>
+          {(["zh-CN", "en"] as const).map((language) => {
+            const selected = (prefs?.language ?? (navigator.language.toLowerCase().startsWith("zh") ? "zh-CN" : "en")) === language;
+            return <button key={language} type="button" role="radio" aria-checked={selected} className={selected ? "active" : ""} onClick={() => onLanguageChange(language)}>{language === "zh-CN" ? t("common.chinese") : t("common.english")}</button>;
+          })}
+        </div>
       </div>
     </div>
     <div className="setting">
@@ -474,8 +477,8 @@ export function SettingsDialog({
         <div className="settings-main">
           <header className="settings-head">
             <div>
-              <h2 id="settings-title">{HEADINGS[section].title}</h2>
-              {HEADINGS[section].lead && <p>{HEADINGS[section].lead}</p>}
+              <h2 id="settings-title">{section === "general" ? t("settings.generalTitle") : HEADINGS[section].title}</h2>
+              {(section === "general" ? t("settings.generalLead") : HEADINGS[section].lead) && <p>{section === "general" ? t("settings.generalLead") : HEADINGS[section].lead}</p>}
             </div>
             <button type="button" className="icon-button" aria-label="关闭设置" ref={closeButton} onClick={onClose}>
               <CloseIcon />
