@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { createPreview, fileInFolder, htmlFilesIn, localRedirect, readListening } from "../src/server/preview";
+import { createPreview, fileInFolder, htmlFilesIn, localPreviewOrigin, localRedirect, readListening } from "../src/server/preview";
 import { frpcConfig, previewSubdomain } from "../src/remote/tunnel";
 
 function listen(server: http.Server): Promise<number> {
@@ -94,6 +94,17 @@ describe("preview relay", () => {
     expect(localRedirect("http://localhost:5173", 5173)).toBe("/");
     expect(localRedirect("http://localhost:3000/x", 5173)).toBe("http://localhost:3000/x");
     expect(localRedirect("https://example.com/", 5173)).toBe("https://example.com/");
+  });
+});
+
+describe("preview addresses on this PC", () => {
+  it("gives each port and folder a host of its own, the same one each time", () => {
+    expect(localPreviewOrigin(4790, 5173)).toBe("http://p5173.localhost:4790");
+    expect(localPreviewOrigin(4790, { port: 3000 })).toBe("http://p3000.localhost:4790");
+    const a = localPreviewOrigin(4790, { root: "C:/work/a", entry: "index.html" });
+    expect(a).toMatch(/^http:\/\/f[0-9a-f]{12}\.localhost:4790$/);
+    expect(localPreviewOrigin(4790, { root: "C:/work/a", entry: "other.html" })).toBe(a);
+    expect(localPreviewOrigin(4790, { root: "C:/work/b", entry: "index.html" })).not.toBe(a);
   });
 });
 

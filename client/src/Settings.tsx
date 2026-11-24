@@ -23,6 +23,7 @@ import { ToolIcon } from "./ToolIcon";
 import { toolName } from "./text";
 import { PLUGINS, PluginMarket, type PluginId } from "./Plugins";
 import { THEME_LABEL, useTheme, type Theme } from "./theme";
+import { WORKFLOWS_SHOWN } from "./features";
 
 export type Section = "general" | "models" | "market" | "help";
 
@@ -383,7 +384,7 @@ export function SettingsDialog({
           )}
 
           <div className="pref-group">
-            {(["models", "help"] as MenuPage[]).map((key) => {
+            {((WORKFLOWS_SHOWN ? ["models", "help"] : ["help"]) as MenuPage[]).map((key) => {
               const { title, Icon } = PAGES[key];
               return (
                 <button key={key} type="button" className="pref-row" onClick={() => openSub(key)}>
@@ -408,7 +409,7 @@ export function SettingsDialog({
     <div className="settings-body">
       {section === "help" ? (
         <HelpContent />
-      ) : section === "models" ? (
+      ) : section === "models" && WORKFLOWS_SHOWN ? (
         <ModelManager />
       ) : section === "market" ? (
         market
@@ -449,7 +450,7 @@ export function SettingsDialog({
             <span>MirrorMix</span>
           </div>
           {tab("general", SlidersIcon, "通用设置")}
-          {tab("models", ModelIcon, "模型管理")}
+          {WORKFLOWS_SHOWN && tab("models", ModelIcon, "模型管理")}
           {tab("help", HelpIcon, "帮助")}
         </nav>
 

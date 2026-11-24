@@ -36,7 +36,7 @@ import { createWorkflowEngine } from "../workflow/engine";
 import { supervisorAi } from "../workflow/aiBridge";
 import { createModelStore } from "../models/modelStore";
 import { verifyWindowsLogin } from "./windowsLogin";
-import { createPreview, htmlFileAt, htmlFilesIn, listeningPorts } from "./preview";
+import { createPreview, htmlFileAt, htmlFilesIn, listeningPorts, localPreviewOrigin } from "./preview";
 
 const PROCESS_QUERY = [
   "-NoProfile",
@@ -183,6 +183,17 @@ const supervisor = createSupervisor({
     desktopOnly || detectTools(listProcesses()).codex.running ? codexDesktopSession(roots.codexSessionsDir, id) : null,
   desktopSession: (id) => claudeDesktopSession(roots.claudeDataDir, id),
   readDesktopStream: (title) => desktop.read(title),
+  // Questions the app windows ask in a conversation (allow, approve, pick), read off the window and answered there.
+  readWindowPrompt: (tool, title) =>
+    tool === "claude" ? desktop.prompt(title) : tool === "codex" ? codexDesktop.prompt(title) : tool === "cursor" ? cursorDesktop.prompt(title) : null,
+  answerWindowPrompt: (tool, title, label, id) =>
+    tool === "claude"
+      ? desktop.answer(title, label)
+      : tool === "codex"
+        ? codexDesktop.answer(title, label, id)
+        : tool === "cursor"
+          ? cursorDesktop.answer(title, label)
+          : Promise.reject(new Error("no_option")),
   // The status line or the desktop panel's five-hour window first. Without a current five-hour reading, the app's
   // own meter (usually the weekly limit, labelled 本周) still shows, rather than no quota at all.
   claudeUsage: () => {
@@ -316,7 +327,7 @@ const server = createApp(supervisor, settings, {
   ports: () => listeningPorts([port, previewPort]),
   htmlFiles: (root) => htmlFilesIn(root),
   htmlFile: (root, relative) => htmlFileAt(root, relative),
-  origin: (throughTunnel) => (throughTunnel ? remote.previewOrigin() : `http://127.0.0.1:${previewPort}`),
+  origin: (throughTunnel, target) => (throughTunnel ? remote.previewOrigin() : localPreviewOrigin(previewPort, target)),
 }, pages, undefined, undefined, createCommandTasks(path.join(home, ".mirrormix")), undefined, sshPlugin,
   createWorkflowEngine({
     dir: path.join(home, ".mirrormix"),

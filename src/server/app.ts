@@ -162,8 +162,8 @@ export interface PreviewLink {
   htmlFiles(root: string): Array<{ path: string; size: number; modifiedAt: string }>;
   /** One file of a folder, or null when it is not there (anymore). */
   htmlFile?(root: string, relative: string): { path: string; size: number; modifiedAt: string; title?: string } | null;
-  /** Where the preview listener answers: this PC's own address, or the tunnel's preview subdomain. */
-  origin(throughTunnel: boolean): string | null;
+  /** Where the preview listener answers for a target: an address of its own on this PC, or the tunnel's preview subdomain. */
+  origin(throughTunnel: boolean, target: number | { root: string; entry: string }): string | null;
 }
 
 export function createApp(
@@ -283,8 +283,8 @@ export function createApp(
       if (gate && url.pathname.startsWith("/api/") && url.pathname !== "/api/health" && !signedIn(request)) {
         return sendJson(response, 401, { error: "unauthenticated" });
       }
-      // In use: the page says how long ago the person last touched it. Only then does the sign-in move out another
-      // hour, so a tab left open (which still polls) signs out an hour after the last real use.
+      // In use: the page says how long ago the person last touched it. Only then does the sign-in move out to a
+      // full 15 hours, so a tab left open (which still polls) signs out 15 hours after the last real use.
       if (gate && url.pathname.startsWith("/api/")) {
         const idle = Number(request.headers["x-mirrormix-idle"]);
         const token = readCookie(request.headers.cookie, SESSION_COOKIE);
@@ -628,7 +628,7 @@ export function createApp(
         const publicOrigin = remote?.origin();
         const host = headerList(request.headers["x-forwarded-host"])[0] ?? headerList(request.headers.host)[0] ?? "";
         const throughTunnel = Boolean(publicOrigin && new URL(publicOrigin).host.toLowerCase() === host);
-        const origin = preview.origin(throughTunnel);
+        const origin = preview.origin(throughTunnel, target);
         if (!origin) return sendJson(response, 409, { error: "preview_unavailable" });
         return sendJson(response, 200, { url: `${origin}${preview.issue(target)}` });
       }
@@ -700,6 +700,15 @@ export function createApp(
         const tool = asTool(body.tool);
         if (!tool || (body.choice !== "trust" && body.choice !== "cancel")) return sendJson(response, 400, { error: "bad_request" });
         return sendJson(response, 200, windowOf(supervisor.answer(tool, body.id, body.choice)));
+      }
+      // Answers what the tool stopped to ask (a permission, a plan, a question) with one of the options it offered.
+      if (request.method === "POST" && url.pathname === "/api/sessions/prompt") {
+        const body = await readJson<{ tool: string; id: string; promptId?: string; optionId?: string }>(request);
+        const tool = asTool(body.tool);
+        if (!tool || typeof body.id !== "string" || typeof body.promptId !== "string" || typeof body.optionId !== "string") {
+          return sendJson(response, 400, { error: "bad_request" });
+        }
+        return sendJson(response, 200, windowOf(await supervisor.answerPrompt(tool, body.id, body.promptId, body.optionId)));
       }
       if (request.method === "POST" && url.pathname === "/api/sessions/send") {
         const body = await readJson<{ tool: string; id: string; text: string }>(request);

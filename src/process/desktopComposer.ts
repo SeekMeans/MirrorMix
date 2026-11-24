@@ -21,6 +21,25 @@ export function appendDesktopStream(messages: TranscriptMessage[], live: string)
   return [...messages, { id: "c-stream", role: "assistant", text }];
 }
 
+/** A question read off an app window: its texts and the names of its answer buttons. */
+export interface WindowPrompt {
+  title: string;
+  detail: string;
+  buttons: string[];
+}
+
+export function parseWindowPrompt(raw: string): WindowPrompt | null {
+  if (!raw.trim()) return null;
+  try {
+    const value = JSON.parse(raw) as { title?: unknown; detail?: unknown; buttons?: unknown };
+    const buttons = (Array.isArray(value.buttons) ? value.buttons : [value.buttons]).filter((item): item is string => typeof item === "string" && Boolean(item));
+    if (buttons.length < 2) return null;
+    return { title: typeof value.title === "string" ? value.title : "", detail: typeof value.detail === "string" ? value.detail : "", buttons };
+  } catch {
+    return null;
+  }
+}
+
 interface ComposerResponse {
   ok?: boolean;
   error?: string;
@@ -38,6 +57,9 @@ export function createDesktopComposer(tool: "claude" | "codex" = "claude", usage
   let sending = 0;
   let nextId = 1;
   const cache = new Map<string, { text: string; at: number }>();
+  /** The question each session's conversation was last seen asking in the window, by title. */
+  const prompts = new Map<string, { prompt: WindowPrompt | null; at: number }>();
+  let promptReading = false;
   // Answers are matched to requests by id. Matching by order would hand a late answer to the next request,
   // and from then on every reading of the window would be one step behind.
   const waiters = new Map<string, { owner: ChildProcessWithoutNullStreams; settle: (response: ComposerResponse) => void }>();
@@ -77,7 +99,7 @@ export function createDesktopComposer(tool: "claude" | "codex" = "claude", usage
     });
   };
 
-  const request = (op: "send" | "stream" | "usage" | "create" | "stop", title: string, text = "", threadId = "") => {
+  const request = (op: "send" | "stream" | "usage" | "create" | "stop" | "prompt" | "answer" | "dump", title: string, text = "", threadId = "") => {
     const run = chain.then(
       () =>
         new Promise<ComposerResponse>((resolve, reject) => {
@@ -99,7 +121,7 @@ export function createDesktopComposer(tool: "claude" | "codex" = "claude", usage
             },
             // A send can wait on the window several times (picking the session, the Send button); the script gives up
             // on its own well before this and takes its words back out of the box.
-            op === "send" || op === "create" || op === "stop" ? 30_000 : 8_000,
+            op === "send" || op === "create" || op === "stop" || op === "answer" ? 30_000 : 8_000,
           );
           waiters.set(id, {
             owner: target,
@@ -172,6 +194,43 @@ export function createDesktopComposer(tool: "claude" | "codex" = "claude", usage
         console.warn(`[${tool} window] could not stop the reply in "${title}": ${response.error || "failed"}${detail ? ` (${detail})` : ""}`);
       }
       throw new Error(response.error || "failed");
+    },
+    /**
+     * The question the session's conversation shows in the window, read now and then (null when it asks nothing, or
+     * when the window shows another conversation). Like `read`, it never switches the window to the session.
+     */
+    prompt(title: string): WindowPrompt | null {
+      const hit = prompts.get(title);
+      if ((!hit || Date.now() - hit.at > 1500) && !promptReading && sending === 0) {
+        promptReading = true;
+        void request("prompt", title)
+          .then((response) => {
+            const raw = response.ok && response.text ? Buffer.from(response.text, "base64").toString("utf8") : "";
+            prompts.set(title, { prompt: parseWindowPrompt(raw), at: Date.now() });
+          })
+          .finally(() => {
+            promptReading = false;
+          });
+      }
+      return hit?.prompt ?? null;
+    },
+    /** Clicks `label` in the session's conversation: an answer button, or a question's choice and then its Submit. */
+    async answer(title: string, label: string, threadId?: string) {
+      sending += 1;
+      let response: ComposerResponse;
+      try {
+        response = await request("answer", title, label, threadId);
+      } finally {
+        sending -= 1;
+      }
+      prompts.delete(title);
+      if (response.ok) return;
+      console.warn(`[${tool} window] could not answer in "${title}": ${response.error || "failed"}`);
+      throw new Error(response.error || "failed");
+    },
+    /** Writes the conversation's buttons and texts to ~/.mirrormix/window-prompt-dump.txt, for a new app layout. */
+    async dump(title: string) {
+      await request("dump", title);
     },
     read(title: string) {
       const hit = cache.get(title);

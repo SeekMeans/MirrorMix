@@ -7,11 +7,13 @@ import { OPEN_FILE, type OpenFileRequest } from "./openFile";
 import { workspaceTerminalKey } from "../../src/shared/terminalScope";
 
 import { ModelChip } from "./ModelChip";
+import { PromptCard } from "./PromptCard";
 import { FileBrowser } from "./FileBrowser";
 import { Composer, MessageList } from "./Conversation";
 import { BackIcon, ChatsIcon, FlowIcon, GearIcon, MenuIcon, PuzzleIcon, PushpinIcon, Spinner, TrashIcon, WorkbenchIcon } from "./icons";
 import { PluginsDialog, type PluginId } from "./Plugins";
 import { Workflows } from "./Workflows";
+import { WORKFLOWS_SHOWN } from "./features";
 import { SettingsDialog, type MenuPage, type Section } from "./Settings";
 import { Sidebar, type RailView } from "./Sidebar";
 import { TodayStats } from "./TodayStats";
@@ -674,11 +676,15 @@ export function App({ onLogout }: { onLogout?: () => void }) {
           setPluginsOpen(true);
         }}
         pluginsActive={!mobile && pluginsOpen}
-        onWorkflows={() => {
-          setPluginsOpen(false);
-          setWorkflowsOpen(true);
-        }}
-        workflowsActive={!mobile && workflowsOpen}
+        onWorkflows={
+          WORKFLOWS_SHOWN
+            ? () => {
+                setPluginsOpen(false);
+                setWorkflowsOpen(true);
+              }
+            : undefined
+        }
+        workflowsActive={WORKFLOWS_SHOWN && !mobile && workflowsOpen}
         onLogout={onLogout}
         onRunning={showRunning}
         pinned={prefs?.pinned ?? []}
@@ -699,7 +705,7 @@ export function App({ onLogout }: { onLogout?: () => void }) {
         </main>
       )}
 
-      {!mobile && workflowsOpen && (
+      {WORKFLOWS_SHOWN && !mobile && workflowsOpen && (
         <main className="conversation plugin-page">
           <Workflows
             variant="desk"
@@ -873,7 +879,7 @@ export function App({ onLogout }: { onLogout?: () => void }) {
               )}
               {state?.openError && <p className="banner is-warning">{errorText(state.openError)}</p>}
               {meta?.readOnlyReason && <p className="banner">{errorText(meta.readOnlyReason)}</p>}
-              {meta?.inputPrompt && (
+              {meta?.inputPrompt && !meta.prompt && (
                 <div className="banner is-warning">
                   <p>终端正在等待你的选择，请在会话终端处理后继续聊天。</p>
                   <pre style={{ whiteSpace: "pre-wrap", maxHeight: 220, overflow: "auto" }}>{meta.inputPrompt}</pre>
@@ -885,6 +891,8 @@ export function App({ onLogout }: { onLogout?: () => void }) {
               )}
 
               <MessageList session={session} state={state ?? PLACEHOLDER} />
+
+              {meta?.prompt && <PromptCard key={meta.prompt.id} tool={target.tool} sessionId={target.id} prompt={meta.prompt} />}
 
               <ActionDock
                 tool={target.tool}
@@ -955,7 +963,7 @@ export function App({ onLogout }: { onLogout?: () => void }) {
         <PluginsDialog key={pluginStart ?? "list"} variant="page" startWith={pluginStart} installed={installed} context={{ jobs, placeOf, mobile: true }} onOpenMarket={openMarket} onClose={leavePlugins} />
       )}
 
-      {mobile && screen === "workflows" && <Workflows variant="page" catalog={catalog} tools={shownTools} onOpenSession={chooseIn} />}
+      {WORKFLOWS_SHOWN && mobile && screen === "workflows" && <Workflows variant="page" catalog={catalog} tools={shownTools} onOpenSession={chooseIn} />}
 
       {mobile && screen === "settings" && (
         <SettingsDialog
@@ -982,7 +990,7 @@ export function App({ onLogout }: { onLogout?: () => void }) {
 
       {tabs && (
         <nav className="tabbar" aria-label="主导航">
-          {TABS.map(({ key, label, Icon }) => {
+          {TABS.filter((item) => WORKFLOWS_SHOWN || item.key !== "workflows").map(({ key, label, Icon }) => {
             const on = screen === "list" ? key === LIST_TAB[railView] : screen === key || (key === "settings" && screen === "plugins");
             return (
               <button

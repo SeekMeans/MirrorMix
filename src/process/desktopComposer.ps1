@@ -22,6 +22,20 @@ Add-Type -Namespace Native -Name Win -MemberDefinition @"
 [DllImport("user32.dll")] public static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extraInfo);
 "@
 
+. (Join-Path $PSScriptRoot "windowPrompt.ps1")
+
+# The conversation a question would sit in: the page holding the input box, not the whole window (the sidebar's
+# buttons are not answers).
+function Get-ConversationScope($win) {
+  $prompt = Find-Prompt $win
+  if (-not $prompt) { return $win }
+  $walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
+  $node = $walker.GetParent($prompt)
+  while ($node -and $node.Current.ControlType -ne [System.Windows.Automation.ControlType]::Document) { $node = $walker.GetParent($node) }
+  if ($node) { return $node }
+  return $win
+}
+
 # Win+L switches the input desktop to the secure one. The Claude window stops updating there, so typing into it
 # cannot bring up Send. OpenInputDesktop fails from this session for exactly that case.
 function Test-WorkstationLocked {
@@ -483,9 +497,9 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
       if ($made) { Emit $true "" "" } else { Emit $false "missing" $why }
       continue
     }
-    if ($req.op -eq "stream" -or $req.op -eq "send" -or $req.op -eq "stop") {
+    if ($req.op -in @("stream", "send", "stop", "prompt", "answer")) {
       if (Test-WorkstationLocked) {
-        if ($req.op -eq "stream") { Emit $true "" ""; continue }
+        if ($req.op -eq "stream" -or $req.op -eq "prompt") { Emit $true "" ""; continue }
         Emit $false "locked" ""; continue
       }
     }
@@ -516,7 +530,22 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
       Emit $true "" (Get-StreamText $win)
       continue
     }
-    if ($req.op -ne "send" -and $req.op -ne "stop") { Emit $false "failed" ""; continue }
+    # The question the session's conversation is asking, when that conversation is the one the window shows.
+    # Reading only: the window is not switched to the session for this.
+    if ($req.op -eq "prompt") {
+      if (-not $win) { Emit $true "" ""; continue }
+      $found = Read-WindowPrompt (Get-ConversationScope $win)
+      if (-not $found) { Emit $true "" ""; continue }
+      Emit $true "" ($found | ConvertTo-Json -Compress)
+      continue
+    }
+    if ($req.op -eq "dump") {
+      $target = if ($win) { $win } elseif ($windows.Count) { $windows[0] } else { $null }
+      Dump-WindowPrompt $(if ($target) { Get-ConversationScope $target } else { $null }) $Tool
+      Emit $true "" ""
+      continue
+    }
+    if ($req.op -ne "send" -and $req.op -ne "stop" -and $req.op -ne "answer") { Emit $false "failed" ""; continue }
     $shown = @()
     $script:frontBefore = [Native.Win]::GetForegroundWindow()
     $script:touched = @()
@@ -539,6 +568,24 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
       }
     }
     if (-not $win) { Emit $false "missing" ""; continue }
+    if ($req.op -eq "answer") {
+      $label = Decode $req.text
+      $clicked = $false
+      # The page may take a moment to draw the question after the session was picked.
+      $deadline = [DateTime]::UtcNow.AddSeconds(3)
+      do {
+        $clicked = Answer-WindowPrompt (Get-ConversationScope $win) $label
+        if ($clicked) { break }
+        Start-Sleep -Milliseconds 200
+      } while ([DateTime]::UtcNow -lt $deadline)
+      if (@($shown).Count -gt 0) {
+        Start-Sleep -Milliseconds 400
+        Restore-Minimized @($shown)
+        $shown = @()
+      }
+      if ($clicked) { Emit $true "" "" } else { Emit $false "no_option" $label }
+      continue
+    }
     $prompt = Find-Prompt $win
     if (-not $prompt) { Emit $false "missing" "composer not found"; continue }
     if ($req.op -eq "stop") {

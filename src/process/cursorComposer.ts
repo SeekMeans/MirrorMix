@@ -2,12 +2,14 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseWindowPrompt, type WindowPrompt } from "./desktopComposer";
 
 const scriptPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "cursorComposer.ps1");
 
 interface ComposerResponse {
   ok?: boolean;
   error?: string;
+  text?: string;
 }
 
 /** Types into the open Cursor Agents window. The command-line agent never reaches that conversation. */
@@ -42,7 +44,12 @@ export function createCursorComposer() {
     });
   };
 
-  const request = (op: "send" | "send-now", title: string, text: string) => {
+  /** The question each chat was last seen asking in the window, by title. */
+  const prompts = new Map<string, { prompt: WindowPrompt | null; at: number }>();
+  let promptReading = false;
+  let busy = 0;
+
+  const request = (op: "send" | "send-now" | "prompt" | "answer" | "dump", title: string, text: string) => {
     const run = chain.then(
       () =>
         new Promise<ComposerResponse>((resolve) => {
@@ -69,7 +76,7 @@ export function createCursorComposer() {
             })}\n`,
           );
         }),
-      () => Promise.resolve({ ok: false, error: "failed" }),
+      () => Promise.resolve<ComposerResponse>({ ok: false, error: "failed" }),
     );
     chain = run.then(
       () => undefined,
@@ -83,6 +90,37 @@ export function createCursorComposer() {
       const response = await request("send", title, text);
       if (response.ok) return;
       throw new Error(response.error || "failed");
+    },
+    /** The question the chat shows in Cursor's window, read now and then; null while the window shows another chat. */
+    prompt(title: string): WindowPrompt | null {
+      const hit = prompts.get(title);
+      if ((!hit || Date.now() - hit.at > 2000) && !promptReading && busy === 0) {
+        promptReading = true;
+        void request("prompt", title, "")
+          .then((response) => {
+            const raw = response.ok && response.text ? Buffer.from(response.text, "base64").toString("utf8") : "";
+            prompts.set(title, { prompt: parseWindowPrompt(raw), at: Date.now() });
+          })
+          .finally(() => {
+            promptReading = false;
+          });
+      }
+      return hit?.prompt ?? null;
+    },
+    /** Clicks `label` in the chat: Run, Skip, Accept… or a question's choice. */
+    async answer(title: string, label: string) {
+      busy += 1;
+      try {
+        const response = await request("answer", title, label);
+        prompts.delete(title);
+        if (response.ok) return;
+        throw new Error(response.error || "failed");
+      } finally {
+        busy -= 1;
+      }
+    },
+    async dump(title: string) {
+      await request("dump", title, "");
     },
     async submitNow(title: string, text: string) {
       const response = await request("send-now", title, text);

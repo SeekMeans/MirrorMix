@@ -4,9 +4,9 @@ import path from "node:path";
 
 /**
  * How long a sign-in lasts without use. Using the page moves the end out again (see `renew`), so someone working
- * stays signed in, and a page left alone signs out an hour after its last use. The cookie carries the same lifetime.
+ * stays signed in, and a page left alone signs out 15 hours after its last use. The cookie carries the same lifetime.
  */
-export const LOGIN_LIFETIME_MS = 60 * 60_000;
+export const LOGIN_LIFETIME_MS = 15 * 60 * 60_000;
 
 /** Renewed at most this often, so polling does not rewrite the file on every request. */
 export const LOGIN_RENEW_STEP_MS = 60_000;

@@ -264,6 +264,17 @@ export function indexSessions(roots: CatalogRoots): { claude: StoredSession[]; c
   return { claude: visibleClaude, codex, cursor, deepseek };
 }
 
+/** The open round stops on a call that asks the person (AskUserQuestion, a plan to approve) with no answer yet. */
+export function asksInTranscript(session: Pick<ParsedSession, "messages" | "turnComplete">): boolean {
+  if (session.turnComplete) return false;
+  for (let i = session.messages.length - 1; i >= 0; i--) {
+    const message = session.messages[i];
+    if (message.role === "user") return false;
+    if (message.role === "step" && message.ask && message.result?.status === "running") return true;
+  }
+  return false;
+}
+
 function summaryOf(tool: ToolId, session: StoredSession, pinned: Set<string>, unseen: Set<string>): SessionSummary {
   const working = !session.turnComplete;
   return {
@@ -275,6 +286,7 @@ function summaryOf(tool: ToolId, session: StoredSession, pinned: Set<string>, un
     pinned: pinned.has(session.id.toLowerCase()),
     working,
     unseen: working ? false : unseen.has(session.id.toLowerCase()),
+    ...(asksInTranscript(session) ? { asking: true } : {}),
   };
 }
 
@@ -341,6 +353,7 @@ function group(tool: ToolId, sessions: StoredSession[], pinned: Set<string>, uns
           pinned: pinned.has(session.id.toLowerCase()),
           working,
           unseen: working ? false : unseen.has(session.id.toLowerCase()),
+          ...(asksInTranscript(session) ? { asking: true } : {}),
         };
       });
       return {

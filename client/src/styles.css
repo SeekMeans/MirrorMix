@@ -5155,3 +5155,92 @@ button.pref-row:active { background: var(--rail); }
 .is-mobile .settings-page .settings-subhead > .plugin-head-actions:empty { display: none; }
 .plugin-head-actions .ssh-new-task { height: 34px; padding: 0 12px; border-radius: 17px; font-size: 14px; white-space: nowrap; }
 .plugin-head-actions .ssh-new-task svg { width: 14px; height: 14px; }
+
+/* ---------- 等你确认: what the AI tool stopped to ask ---------- */
+/* Amber, not the reply green: this is the one thing on the page that waits on the person. */
+.prompt-card {
+  width: min(50rem, calc(100% - 32px));
+  margin: 4px auto 10px;
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px 14px;
+  border: 1px solid color-mix(in srgb, var(--amber) 38%, var(--line));
+  border-left: 3px solid var(--amber);
+  border-radius: 4px 12px 12px 4px;
+  background: color-mix(in srgb, var(--amber-soft) 55%, var(--surface));
+  box-shadow: 0 6px 22px rgba(20, 24, 33, 0.08);
+  animation: prompt-in 180ms ease-out;
+}
+@keyframes prompt-in { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .prompt-card { animation: none; } .prompt-pulse { animation: none !important; } }
+.prompt-top { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12px; }
+.prompt-kind { display: inline-flex; align-items: center; gap: 7px; color: var(--amber); font-weight: 700; letter-spacing: 0.02em; }
+.prompt-pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 0 0 color-mix(in srgb, var(--amber) 55%, transparent); animation: prompt-pulse 1.6s ease-out infinite; }
+@keyframes prompt-pulse { 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+.prompt-chip { padding: 1px 8px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); color: var(--muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prompt-where { margin-left: auto; color: var(--faint); white-space: nowrap; }
+.prompt-title { margin: 0; font-size: 15px; font-weight: 650; line-height: 1.5; color: var(--ink); overflow-wrap: anywhere; }
+.prompt-detail { display: grid; gap: 4px; min-width: 0; }
+.prompt-detail pre {
+  margin: 0;
+  max-height: 260px;
+  overflow: auto;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: var(--term);
+  color: var(--term-ink);
+  font: 12.5px/1.55 var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* A plan is prose, not a command. */
+.prompt-detail.is-plan pre { max-height: 340px; background: var(--surface); color: var(--ink); border: 1px solid var(--line-soft); font-family: var(--sans); font-size: 13.5px; line-height: 1.65; }
+.prompt-unfold { justify-self: start; font-size: 12.5px; }
+.prompt-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.prompt-actions .quiet-button { min-height: 34px; padding: 0 14px; font-size: 13.5px; }
+.prompt-actions .quiet-button .spinner { width: 13px; height: 13px; }
+.prompt-actions .prompt-no { color: #c4472f; border-color: color-mix(in srgb, #c4472f 40%, var(--line)); background: var(--surface); }
+.prompt-actions .prompt-no:hover:not(:disabled) { background: color-mix(in srgb, #c4472f 8%, var(--surface)); }
+.prompt-choices { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.prompt-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.prompt-choice:hover:not(:disabled) { border-color: var(--amber); background: color-mix(in srgb, var(--amber-soft) 35%, var(--surface)); }
+.prompt-choice:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.prompt-choice:disabled { cursor: default; opacity: 0.7; }
+.prompt-choice.is-busy { opacity: 1; border-color: var(--amber); }
+.prompt-choice.is-no .prompt-choice-text strong { color: #c4472f; }
+.prompt-choice-n { flex: none; display: grid; place-items: center; width: 22px; height: 22px; margin-top: 1px; border-radius: 6px; background: var(--page); color: var(--muted); font: 600 12px var(--mono); }
+.prompt-choice-n .spinner { width: 12px; height: 12px; }
+.prompt-choice-text { display: grid; gap: 2px; min-width: 0; }
+.prompt-choice-text strong { font-size: 13.5px; font-weight: 600; overflow-wrap: anywhere; }
+.prompt-choice-text span, .prompt-choices.is-static span { color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+.prompt-choices.is-static li { display: grid; gap: 2px; padding: 7px 12px; border-radius: 8px; background: var(--surface); }
+.prompt-choices.is-static strong { font-size: 13px; }
+.prompt-note { margin: 0; color: var(--muted); font-size: 12.5px; }
+.prompt-error { margin: 0; color: #c4472f; font-size: 12.5px; }
+
+/* The list and the phone's home cards say it too. */
+.session-state.is-asking { padding: 1px 7px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); font-weight: 600; font-size: 11.5px; }
+.home-card.is-asking { border-color: color-mix(in srgb, var(--amber) 45%, var(--line)); }
+.home-card.is-asking .home-card-state { color: var(--amber); font-weight: 600; }
+.asking-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--amber); animation: prompt-pulse 1.6s ease-out infinite; }
+
+/* Phone: full width, answers stacked so each is an easy tap. */
+.is-mobile .prompt-card { width: calc(100% - 20px); padding: 12px 12px 12px 13px; }
+.is-mobile .prompt-actions { flex-direction: column; }
+.is-mobile .prompt-actions .quiet-button { width: 100%; min-height: 42px; justify-content: center; }
+.is-mobile .prompt-choice { padding: 11px 12px; }
+.is-mobile .prompt-detail pre { max-height: 200px; }

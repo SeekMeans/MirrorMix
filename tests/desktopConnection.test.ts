@@ -84,17 +84,19 @@ describe("desktop-only messaging", () => {
 
   it("stops listing a session as running once its reply is in, without the conversation being opened", async () => {
     const f = fixture();
+    const claudeFile = path.join(f.roots.claudeProjectsDir, "fixture", "claude-thread.jsonl");
     const supervisor = createSupervisor({ ...f, bins: { claudeExe: "", nodeExe: "", codexJs: "" }, desktopOnly: true,
-      spawn: () => { throw new Error("CLI"); }, listProcesses: () => [], submitCodex: async () => {} });
-    const listed = () => supervisor.catalog().codex.flatMap((group) => group.sessions).find((session) => session.id === "codex-thread");
+      spawn: () => { throw new Error("CLI"); }, listProcesses: () => [], submitDesktop: async () => {},
+      readDesktopStream: () => "", desktopSession: () => ({ title: "Claude title" }) });
+    const listed = () => supervisor.catalog().claude.flatMap((group) => group.sessions).find((session) => session.id === "claude-thread");
     try {
-      supervisor.open("codex", "codex-thread");
-      await supervisor.send("codex", "codex-thread", "ping from the page");
+      supervisor.open("claude", "claude-thread");
+      await supervisor.send("claude", "claude-thread", "ping from the page");
       expect(listed()?.working).toBe(true);
-      writeFileSync(f.codexFile, [...f.codexRows,
-        { type: "response_item", payload: { type: "message", role: "user", content: [{ type: "input_text", text: "ping from the page" }] } },
-        { type: "response_item", payload: { type: "message", role: "assistant", phase: "final_answer", content: [{ type: "output_text", text: "pong" }] } },
-        { type: "event_msg", payload: { type: "task_complete" } },
+      writeFileSync(claudeFile, [
+        { type: "user", sessionId: "claude-thread", cwd: f.root, message: { role: "user", content: "Claude title" } },
+        { type: "user", sessionId: "claude-thread", cwd: f.root, message: { role: "user", content: "ping from the page" } },
+        { type: "assistant", sessionId: "claude-thread", cwd: f.root, message: { role: "assistant", stop_reason: "end_turn", content: [{ type: "text", text: "pong" }] } },
       ].map(row => JSON.stringify(row)).join("\n"));
       // Only the list is read here, as the workbench does; the conversation itself is never asked for.
       expect(listed()?.working).toBe(false);

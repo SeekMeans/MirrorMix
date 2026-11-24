@@ -21,6 +21,27 @@ export interface TodoItem {
   status: "pending" | "in_progress" | "completed";
 }
 
+/**
+ * Something the AI tool stopped to ask the person: allow a command or an edit, approve a plan, pick an answer.
+ * The page shows it as a card and answers it by `options[].id`, in the terminal or the app window it came from.
+ */
+export interface ToolPrompt {
+  /** Changes whenever the question does, so an answer meant for an earlier question is refused. */
+  id: string;
+  kind: "permission" | "question" | "plan" | "trust";
+  /** The question as the tool words it: "Do you want to proceed?", "Allow this command?". */
+  title: string;
+  /** What it is about: the command, the file, the plan, shown under the title. */
+  detail?: string;
+  /** For a question: the short header above it (AskUserQuestion's chip), when there is one. */
+  header?: string;
+  options: Array<{ id: string; label: string; description?: string; tone?: "yes" | "no" }>;
+  /** Where it is answered: keys in MirrorMix's own terminal, or a click in the app's window. */
+  via: "terminal" | "window";
+  /** Seen in the transcript only, with no way to answer from here yet: the card says where to answer. */
+  readOnly?: boolean;
+}
+
 /** What a tool call produced, shaped the way the terminal prints it under `⎿`. */
 export interface StepResult {
   status: "running" | "ok" | "error";
@@ -52,6 +73,8 @@ export interface TranscriptMessage {
   tokens?: number;
   /** On a turn: closed because its last tool call went past its own time limit with no result and no other record. */
   stalled?: { tool: string; limitMs: number };
+  /** On a step that asks the person (AskUserQuestion, ExitPlanMode): what it asks, while it waits for an answer. */
+  ask?: { kind: "question" | "plan"; questions: Array<{ header?: string; question: string; options: Array<{ label: string; description?: string }>; multiSelect?: boolean }>; plan?: string };
 }
 
 export interface ParsedSession {
@@ -97,6 +120,8 @@ export interface SessionSummary {
   working: boolean;
   /** The reply finished, and the AI tool still marks it unseen. Shown as a green dot. */
   unseen: boolean;
+  /** The reply is waiting on the person: a permission, a plan or a question. Shown as “等你确认”. */
+  asking?: boolean;
 }
 
 export interface WorkspaceGroup {

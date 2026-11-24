@@ -28,20 +28,20 @@ describe("login sessions", () => {
     expect(createLoginSessions(where, () => now).has("b")).toBe(false);
   });
 
-  it("lasts an hour, and use pushes the end out again", () => {
-    expect(LOGIN_LIFETIME_MS).toBe(60 * 60_000);
+  it("lasts 15 hours, and use pushes the end out again", () => {
+    expect(LOGIN_LIFETIME_MS).toBe(15 * 60 * 60_000);
     let now = 1_000_000;
     const sessions = createLoginSessions(file(), () => now);
     sessions.add("tok", "tester");
     // Used just now: nothing to move yet, so no new cookie on every poll.
     now += LOGIN_RENEW_STEP_MS - 1;
     expect(sessions.renew("tok")).toBe(false);
-    // Used 50 minutes in: good for another full hour from then.
-    now += 50 * 60_000;
+    // Used 10 hours in: good for another full 15 hours from then.
+    now += 10 * 60 * 60_000;
     expect(sessions.renew("tok")).toBe(true);
-    now += 59 * 60_000;
+    now += 14 * 60 * 60_000 + 59 * 60_000;
     expect(sessions.has("tok")).toBe(true);
-    // Left alone for the hour after its last use: gone, and use can no longer bring it back.
+    // Left alone for the 15 hours after its last use: gone, and use can no longer bring it back.
     now += 2 * 60_000;
     expect(sessions.has("tok")).toBe(false);
     expect(sessions.renew("tok")).toBe(false);
@@ -52,20 +52,20 @@ describe("login sessions", () => {
     const where = file();
     let now = 5_000_000;
     createLoginSessions(where, () => now).add("tok", "tester");
-    now += 40 * 60_000;
+    now += 10 * 60 * 60_000;
     expect(createLoginSessions(where, () => now).renew("tok")).toBe(true);
-    now += 50 * 60_000;
+    now += 12 * 60 * 60_000;
     expect(createLoginSessions(where, () => now).has("tok")).toBe(true);
   });
 
-  it("cuts sign-ins saved under the old 30-day lifetime down to an hour", () => {
+  it("cuts sign-ins saved under the old 30-day lifetime down to 15 hours", () => {
     const where = file();
     const now = 9_000_000;
     createLoginSessions(where, () => now).add("tok", "tester");
     const saved = JSON.parse(readFileSync(where, "utf8")) as Record<string, { expiresAt: number }>;
     for (const entry of Object.values(saved)) entry.expiresAt = now + 30 * 24 * 3_600_000;
     writeFileSync(where, JSON.stringify(saved));
-    // Restarted now: still signed in, but only for the next hour.
+    // Restarted now: still signed in, but only for the next 15 hours.
     expect(createLoginSessions(where, () => now).has("tok")).toBe(true);
     expect(createLoginSessions(where, () => now + LOGIN_LIFETIME_MS + 1).has("tok")).toBe(false);
   });

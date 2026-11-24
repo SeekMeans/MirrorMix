@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { closeSync, createReadStream, openSync, readdirSync, readFileSync, readSync, realpathSync, statSync } from "node:fs";
 import { MARKDOWN_FILE, markdownPage, markdownTitle } from "./markdownPage";
 import http from "node:http";
@@ -31,6 +31,20 @@ const TICKET_MS = 60_000;
 const PASS_MS = 12 * 3_600_000;
 const COOKIE = "mm_preview";
 const ENTER = "/__mirrormix/enter";
+
+/**
+ * The local address one target is shown on. The pass is a cookie, and a cookie belongs to a host (not to a port), so
+ * one shared address could only show one target at a time: opening a second port replaced the first one's pass.
+ * Each port, and each folder, gets a host of its own under .localhost instead, which browsers send to this PC's
+ * loopback. The same target always gets the same host, so a page keeps its own storage when it is opened again.
+ */
+export function localPreviewOrigin(previewPort: number, target: number | PreviewTarget): string {
+  const label =
+    typeof target === "number" || "port" in target
+      ? `p${typeof target === "number" ? target : target.port}`
+      : `f${createHash("sha1").update(path.resolve(target.root).toLowerCase()).digest("hex").slice(0, 12)}`;
+  return `http://${label}.localhost:${previewPort}`;
+}
 
 export function previewPortAllowed(port: number, blocked: number[]): boolean {
   return Number.isInteger(port) && port >= 1024 && port <= 65535 && !blocked.includes(port);

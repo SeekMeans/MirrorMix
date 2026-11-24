@@ -63,7 +63,12 @@ export function errorText(code: string | undefined): string {
     return "Cursor 窗口是最小化的，读不到里面的对话，命令行也没能接手回复。把 Cursor 窗口还原（不用放到最前面），再发送一次。";
   if (code === "tool_offline") return "这个工具的客户端没有在本机开启。打开它之后再试。";
   if (code === "missing_workspace") return "工作区目录已经不在了，这条会话只能查看。";
-  if (code === "no_question") return "终端已经不在问这个问题了。";
+  if (code === "no_question") return "它已经不在问这个问题了，可能已经在工具里答过。";
+  if (code === "prompt_changed") return "问题刚刚变了，没有替你回答。看一下新的问题再选。";
+  if (code === "no_option" || code === "option_missing") return "窗口里没找到这个选项。到工具里直接回答一下。";
+  if (code === "answer_locked") return "电脑锁屏了，点不到桌面应用里的按钮。解锁后再选，或者到工具里直接回答。";
+  if (code === "answer_window_missing") return "没有在桌面应用里找到这场对话，先在应用里点开它再选。";
+  if (code === "answer_failed") return "没能在桌面应用里点下这个选项。到工具里直接回答一下。";
   if (code === "create_failed") return "没有等到新会话，进程已结束。";
   if (code === "unknown_workspace") return "这个工作区不在列表里。";
   if (code === "unknown_session") return "这条会话已经不在了。";

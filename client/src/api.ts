@@ -66,6 +66,21 @@ export interface SessionSummary {
   working: boolean;
   /** The reply finished and the AI tool still marks it unseen. */
   unseen: boolean;
+  /** The reply waits on the person: a permission, a plan or a question. */
+  asking?: boolean;
+}
+
+/** Something the AI tool stopped to ask: allow a command or an edit, approve a plan, pick an answer. */
+export interface ToolPrompt {
+  id: string;
+  kind: "permission" | "question" | "plan" | "trust";
+  title: string;
+  detail?: string;
+  header?: string;
+  options: Array<{ id: string; label: string; description?: string; tone?: "yes" | "no" }>;
+  via: "terminal" | "window";
+  /** Only shown here; it is answered in the tool itself. */
+  readOnly?: boolean;
 }
 
 export interface WorkspaceGroup {
@@ -128,6 +143,8 @@ export interface SessionView {
   takenOver?: boolean;
   /** The terminal is asking whether to trust the session folder. */
   question?: "trust";
+  /** What the tool is waiting on the person for. */
+  prompt?: ToolPrompt;
   /** What the process printed before it stopped, when it stopped almost at once. */
   exitNote?: string;
   inputPrompt?: string;
@@ -174,7 +191,7 @@ export const AUTH_EXPIRED = "mirrormix:auth-expired";
 
 /**
  * The last time the person touched the page. Each request tells the server how long ago that was, and only recent
- * use extends the sign-in: a tab left open keeps polling, but signs out an hour after it was last used.
+ * use extends the sign-in: a tab left open keeps polling, but signs out 15 hours after it was last used.
  */
 let lastInput = Date.now();
 if (typeof window !== "undefined") {
@@ -480,6 +497,9 @@ export const api = {
     request<ServiceList & TerminalList & { focus?: string }>("/api/services/run", { method: "POST", body: JSON.stringify({ tool, id, action, names }) }),
   answer: (tool: ToolId, id: string, choice: "trust" | "cancel") =>
     request<SessionWindow>("/api/sessions/answer", { method: "POST", body: JSON.stringify({ tool, id, choice }) }),
+  /** Answers what the tool asked (`SessionWindow.prompt`) with one of its options. */
+  answerPrompt: (tool: ToolId, id: string, promptId: string, optionId: string) =>
+    request<SessionWindow>("/api/sessions/prompt", { method: "POST", body: JSON.stringify({ tool, id, promptId, optionId }) }),
   /** Stops the reply under way: Esc in MirrorMix's own terminal, the Stop button in the desktop app. */
   interrupt: (tool: ToolId, id: string) =>
     request<{ ok: true }>("/api/sessions/interrupt", { method: "POST", body: JSON.stringify({ tool, id }) }),

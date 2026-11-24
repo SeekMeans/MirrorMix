@@ -24,6 +24,19 @@ public static bool IsLocked() {
 }
 "@
 
+. (Join-Path $PSScriptRoot "windowPrompt.ps1")
+
+# The chat a question would sit in: the pane holding the transcript and the input box, not the chat list beside it.
+function Get-ChatScope($win) {
+  $transcript = $win.FindFirst(
+    [System.Windows.Automation.TreeScope]::Descendants,
+    (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty, "Chat transcript")))
+  if (-not $transcript) { return $win }
+  $parent = [System.Windows.Automation.TreeWalker]::ControlViewWalker.GetParent($transcript)
+  if ($parent) { return $parent }
+  return $transcript
+}
+
 # While the screen is locked the input desktop is the secure one, and clicks and typing cannot reach Cursor.
 function Test-WorkstationLocked {
   return [AimissDesk.Input]::IsLocked()
@@ -72,8 +85,8 @@ function Hide-Again($win) {
   } catch {}
 }
 
-function Emit($ok, $errorName) {
-  $payload = @{ ok = $ok; error = $errorName }
+function Emit($ok, $errorName, $text = "") {
+  $payload = @{ ok = $ok; error = $errorName; text = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([string]$text)) }
   [Console]::Out.WriteLine(($payload | ConvertTo-Json -Compress))
   [Console]::Out.Flush()
 }
@@ -321,9 +334,23 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
   if (-not $line.Trim()) { continue }
   try {
     $req = $line | ConvertFrom-Json
-    if ($req.op -ne "send" -and $req.op -ne "send-now") { Emit $false "failed"; continue }
+    if ($req.op -notin @("send", "send-now", "prompt", "answer", "dump")) { Emit $false "failed"; continue }
     $win = Find-CursorWindow
-    if (-not $win) { Emit $false "missing"; continue }
+    if (-not $win) {
+      if ($req.op -eq "prompt" -or $req.op -eq "dump") { Emit $true ""; continue }
+      Emit $false "missing"; continue
+    }
+    # Reading only: the chat the window shows, if it is this one. A minimized window shows nothing to read.
+    if ($req.op -eq "prompt" -or $req.op -eq "dump") {
+      if (Test-Minimized $win) { Emit $true ""; continue }
+      $wanted = Decode $req.title
+      $here = Same-Title (Get-ActiveChat $win) $wanted
+      if ($req.op -eq "dump") { Dump-WindowPrompt (Get-ChatScope $win) "cursor"; Emit $true ""; continue }
+      if (-not $here) { Emit $true ""; continue }
+      $found = Read-WindowPrompt (Get-ChatScope $win)
+      if ($found) { Emit $true "" ($found | ConvertTo-Json -Compress) } else { Emit $true "" }
+      continue
+    }
     $restored = $false
     if (Test-Minimized $win) {
       if (-not (Test-WorkstationLocked)) { Emit $false "minimized"; continue }
@@ -333,6 +360,19 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
     try {
     $title = Decode $req.title
     if (-not (Select-Chat $win $title)) { Emit $false "missing"; continue }
+    if ($req.op -eq "answer") {
+      $label = Decode $req.text
+      $clicked = $false
+      $deadline = [DateTime]::UtcNow.AddSeconds(3)
+      do {
+        $clicked = Answer-WindowPrompt (Get-ChatScope $win) $label
+        if ($clicked) { break }
+        Start-Sleep -Milliseconds 200
+      } while ([DateTime]::UtcNow -lt $deadline)
+      if ($restored) { Start-Sleep -Milliseconds 600 }
+      if ($clicked) { Emit $true "" } else { Emit $false "no_option" }
+      continue
+    }
     if ($req.op -eq "send-now") {
       if (-not (Invoke-SendNow $win (Decode $req.text))) { Emit $false "failed"; continue }
       Emit $true ""

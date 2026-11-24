@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { countToday, startOfToday, type TodayStats } from "../catalog/todayStats";
 import { isCodexHistoryReference } from "../catalog/codexSqliteHistory";
 import { existsSync, statSync } from "node:fs";
@@ -7,7 +7,8 @@ import { cursorChatModel, readCursorQueue } from "../catalog/cursor";
 import type { ToolQuota } from "../catalog/quotas";
 import { indexSessions, listClaudeSessionFiles, listCodexSessionFiles, readCatalog, readSession, type Catalog, type CatalogRoots } from "../catalog/readCatalog";
 import { readSchedules } from "../schedule/readSchedules";
-import type { LaunchRequest, ParsedSession, ScheduleJob, SessionStatus, ToolBins, ToolId, TranscriptMessage } from "../shared/types";
+import type { LaunchRequest, ParsedSession, ScheduleJob, SessionStatus, ToolBins, ToolId, ToolPrompt, TranscriptMessage } from "../shared/types";
+import { readScreenPrompt, screenAnswerKeys } from "../transcript/screenPrompt";
 import { settleBeforeProcess } from "../transcript/claude";
 import { createScreenMirror, type ScreenMirror } from "../transcript/mirror";
 import { asksForLogin, asksForTrust, trustKeys } from "../transcript/screen";
@@ -15,9 +16,61 @@ import { isOccupied, type ProcessInfo } from "./occupancy";
 import type { DeepseekRun, DeepseekRunResult } from "./deepseekAgent";
 import { DeepseekAppError, type DeepseekApp } from "./deepseekApp";
 import { deepseekSessionFile } from "../catalog/readCatalog";
-import { appendDesktopStream } from "./desktopComposer";
+import { appendDesktopStream, type WindowPrompt } from "./desktopComposer";
 import { injectClaudeInbox, type ClaudeInbox } from "./claudeInbox";
 import { codexConfigFix, encodeClaudeProject, exitNote, launchSpec, samePath } from "./launch";
+
+/** The latest call in the open round that waits on the person and has no answer yet. */
+export function pendingAsk(messages: TranscriptMessage[]): NonNullable<TranscriptMessage["ask"]> | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i];
+    if (message.role === "user") return undefined;
+    if (message.role === "step" && message.ask && message.result?.status === "running") return message.ask;
+  }
+  return undefined;
+}
+
+const promptId = (parts: string[]) => createHash("sha1").update(parts.join("\n")).digest("hex").slice(0, 12);
+const YES_LABEL = /^(?:allow|always allow|approve|accept|run|yes|proceed|continue|keep planning|trust|允许|始终允许|总是允许|批准|接受|运行|是|继续|信任)/i;
+const NO_LABEL = /^(?:deny|reject|decline|don.?t allow|do not allow|skip|no\b|拒绝|跳过|否|不允许|不同意)/i;
+const toneOf = (label: string) => (NO_LABEL.test(label) ? { tone: "no" as const } : YES_LABEL.test(label) ? { tone: "yes" as const } : {});
+
+/** A question read off an app window, worded with the transcript's own question when it has one. */
+export function promptFromWindow(seen: WindowPrompt, ask?: NonNullable<TranscriptMessage["ask"]>): ToolPrompt {
+  const kind: ToolPrompt["kind"] = ask?.kind === "plan" ? "plan" : ask?.kind === "question" ? "question" : "permission";
+  const title = seen.title || (kind === "plan" ? "要按这个计划开始吗？" : "需要你确认");
+  const detail = seen.detail || (kind === "plan" ? (ask?.plan ?? "") : "");
+  return {
+    id: promptId(["window", title, detail, ...seen.buttons]),
+    kind,
+    title,
+    ...(detail ? { detail } : {}),
+    options: seen.buttons.map((label) => ({ id: label, label, ...toneOf(label) })),
+    via: "window",
+  };
+}
+
+/**
+ * A question only the transcript shows. Its choices are clicked by name in the app window when the session is
+ * followed there; a plan, or a question of several parts, is answered in the tool itself.
+ */
+export function promptFromAsk(ask: NonNullable<TranscriptMessage["ask"]>, inWindow: boolean): ToolPrompt {
+  if (ask.kind === "plan") {
+    return { id: promptId(["plan", ask.plan ?? ""]), kind: "plan", title: "要按这个计划开始吗？", ...(ask.plan ? { detail: ask.plan } : {}), options: [], via: "window", readOnly: true };
+  }
+  const first = ask.questions[0];
+  const many = ask.questions.length;
+  const options = first.options.map((option) => ({ id: option.label, label: option.label, ...(option.description ? { description: option.description } : {}) }));
+  return {
+    id: promptId(["question", ...ask.questions.map((item) => item.question), ...options.map((item) => item.label)]),
+    kind: "question",
+    title: first.question,
+    ...(first.header || many > 1 ? { header: [first.header, many > 1 ? `第 1 / ${many} 题` : ""].filter(Boolean).join(" · ") } : {}),
+    options,
+    via: "window",
+    ...(!inWindow || many > 1 || first.multiSelect ? { readOnly: true } : {}),
+  };
+}
 
 /** What the session row is allowed to say. A reply that has not finished is "running"; occupancy is not part of that. */
 export function shownActivity(
@@ -61,6 +114,8 @@ export interface SessionView {
   takenOver?: boolean;
   /** The terminal is asking whether to trust the folder; it takes no message until that is answered. */
   question?: "trust";
+  /** The tool is waiting on the person: allow a command, approve a plan, pick an answer. Answered by `answerPrompt`. */
+  prompt?: ToolPrompt;
   /** What the process printed before it stopped, when it stopped almost at once. */
   exitNote?: string;
   /** Visible CLI prompt when the terminal is waiting for a choice, not a model reply. */
@@ -165,6 +220,10 @@ export interface SupervisorOptions {
    * through its window even when it is not running there yet, so both sides stay on one conversation.
    */
   desktopSession?: (sessionId: string) => { title: string } | null;
+  /** The question an app window (Claude or Codex desktop, Cursor) shows in a conversation, by the app's title for it. */
+  readWindowPrompt?: (tool: ToolId, title: string) => WindowPrompt | null;
+  /** Clicks `label` in that conversation: an answer button, or a question's choice. */
+  answerWindowPrompt?: (tool: ToolId, title: string, label: string, sessionId: string) => Promise<void>;
   readDesktopStream?: (title: string) => string;
   /** The Claude desktop app's own usage meter, when its window shows one. Replaces the guess from transcripts. */
   claudeUsage?: () => ToolQuota | null;
@@ -284,6 +343,8 @@ export interface Supervisor {
   /** Stops the reply under way, the way the person would in the tool itself. */
   interrupt(tool: ToolId, id: string): Promise<void>;
   answer(tool: ToolId, id: string, choice: "trust" | "cancel"): SessionView;
+  /** Answers what the tool is asking (`SessionView.prompt`) with one of its options; refused once the question changed. */
+  answerPrompt(tool: ToolId, id: string, promptId: string, optionId: string): Promise<SessionView>;
   /** "trash": its files went to the Recycle Bin. "hidden": an app keeps it, so it only left this list. */
   remove(tool: ToolId, id: string): Promise<{ removed: "trash" | "hidden" }>;
   connectTerminal(tool: ToolId, id: string, socket: TerminalSocket): void;
@@ -321,6 +382,68 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
     stored && runtime.tool === "claude" && runtime.pty && runtime.ptyStartedAt
       ? (settleBeforeProcess(stored, runtime.ptyStartedAt) as T)
       : stored;
+
+  /** The name the app's window knows a session by, for a session followed in that window; null for any other. */
+  const windowTitleOf = (runtime: Runtime, storedTitle?: string): string | null => {
+    if (runtime.tool === "cursor" && runtime.headless && !runtime.takenOver) return storedTitle || runtime.title;
+    if (runtime.inbox && !runtime.pty && (runtime.tool === "claude" || runtime.tool === "codex")) {
+      const own = runtime.tool === "claude" ? options.desktopSession?.(runtime.id)?.title : options.codexDesktopSession?.(runtime.id)?.title;
+      return own || storedTitle || runtime.title;
+    }
+    return null;
+  };
+
+  /**
+   * What the session is waiting on the person for, if anything. A terminal's own menu is read off its screen; an app
+   * window's question by its buttons; a question only the transcript shows (AskUserQuestion, a plan) by its words.
+   */
+  const promptFor = (runtime: Runtime, stored: ParsedSession | null | undefined, open: boolean): ToolPrompt | undefined => {
+    if (runtime.pty) {
+      const screen = readScreenPrompt(runtime.mirror.lines());
+      // The trust question has its own banner, which also holds back the message box.
+      return screen && screen.kind !== "trust" ? screen : undefined;
+    }
+    if (!open) return undefined;
+    const ask = stored ? pendingAsk(stored.messages) : undefined;
+    const title = windowTitleOf(runtime, stored?.title);
+    const seen = title ? (options.readWindowPrompt?.(runtime.tool, title) ?? null) : null;
+    if (seen) return promptFromWindow(seen, ask);
+    if (ask) return promptFromAsk(ask, Boolean(title && options.answerWindowPrompt));
+    return undefined;
+  };
+
+  /** Answers the session's question with one of its options, where it was asked: keys in the terminal, a click in the window. */
+  const answerPrompt = async (tool: ToolId, id: string, promptId: string, optionId: string): Promise<SessionView> => {
+    const runtime = runtimeFor(tool, id);
+    if (!runtime) throw new ApiError(404, "unknown_session");
+    const stored = currentRound(runtime, runtime.filePath ? readSession(runtime.tool, runtime.filePath, options.roots.cursorStateDb) : null);
+    const prompt = promptFor(runtime, stored, true);
+    if (!prompt) throw new ApiError(409, "no_question");
+    // The question on screen changed since the page showed it: an answer meant for the earlier one is not given.
+    if (prompt.id !== promptId) throw new ApiError(409, "prompt_changed");
+    const option = prompt.options.find((item) => item.id === optionId);
+    if (!option || prompt.readOnly) throw new ApiError(409, "no_option");
+    if (prompt.via === "terminal") {
+      const keys = runtime.pty ? screenAnswerKeys(runtime.mirror.lines(), promptId, optionId) : null;
+      if (!keys || !runtime.pty) throw new ApiError(409, "prompt_changed");
+      runtime.pty.write(keys);
+    } else {
+      const title = windowTitleOf(runtime, stored?.title);
+      if (!title || !options.answerWindowPrompt) throw new ApiError(409, "no_option");
+      try {
+        await options.answerWindowPrompt(tool, title, option.label, runtime.id);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : "";
+        if (reason === "locked") throw new ApiError(502, "answer_locked");
+        if (reason === "minimized") throw new ApiError(502, "cursor_minimized");
+        if (reason === "no_option") throw new ApiError(409, "option_missing");
+        if (reason === "missing") throw new ApiError(502, "answer_window_missing");
+        throw new ApiError(502, "answer_failed");
+      }
+    }
+    emit(tool, id);
+    return viewOf(runtime);
+  };
 
   const viewOf = (runtime: Runtime): SessionView => {
     if (runtime.tool === "codex" && runtime.filePath && !isCodexHistoryReference(runtime.filePath) && !existsSync(runtime.filePath)) {
@@ -406,6 +529,10 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
       ...(runtime.takenOver ? { takenOver: true } : {}),
       ...(appOnly ? { readOnlyReason: "deepseek_app_session" } : {}),
       ...(trusting ? { question: "trust" as const } : {}),
+      ...((() => {
+        const prompt = trusting ? undefined : promptFor(runtime, stored, !turnComplete || Boolean(running));
+        return prompt ? { prompt } : {};
+      })()),
       ...modelOf(runtime.tool, runtime.id, stored),
       // Only Claude Code's own terminal takes `/model <name>` as a command. The desktop apps and Codex's picker do not.
       ...(runtime.tool === "claude" && runtime.pty && runtime.status === "running" ? { modelSwitch: true } : {}),
@@ -444,12 +571,16 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
             session.working && runtime?.pty && runtime.filePath
               ? currentRound(runtime, readSession(runtime.tool, runtime.filePath, options.roots.cursorStateDb))?.turnComplete === true
               : false;
+          const asking =
+            session.asking ||
+            (runtime && (session.working || runtime.pendingTurn) ? Boolean(promptFor(runtime, null, true)) : false);
           const activity = shownActivity(stale ? { ...session, working: false } : session, tool !== "codex" && Boolean(runtime?.pendingTurn), live.trim().length > 0);
           return {
             ...session,
             title: session.title || runtime?.title || "",
-            working: activity.working,
+            working: activity.working || Boolean(asking),
             unseen: activity.unseen,
+            ...(asking ? { asking: true } : {}),
             status: runtime?.status === "failed" || runtime?.status === "create_failed" ? runtime.status : session.status,
           };
         });
@@ -1658,6 +1789,7 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
     sendNow,
     interrupt,
     answer,
+    answerPrompt,
     connectTerminal,
     subscribe,
     dispose() {

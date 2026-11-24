@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, type SessionStatus, type SessionWindow, type ToolId, type TranscriptMessage } from "./api";
+import { api, type SessionStatus, type SessionWindow, type ToolId, type ToolPrompt, type TranscriptMessage } from "./api";
 import { watchSession, type FeedLink } from "./sessionFeed";
 
 /** Messages fetched per request, both for the first screen and for each step back in history. */
@@ -20,6 +20,8 @@ export interface SessionMeta {
   takenOver?: boolean;
   /** The terminal is asking whether to trust the session folder. */
   question?: "trust";
+  /** What the tool is waiting on the person for: a permission, a plan, a question. */
+  prompt?: ToolPrompt;
   exitNote?: string;
   inputPrompt?: string;
   readOnlyReason?: string;
@@ -73,6 +75,7 @@ function metaOf(frame: SessionWindow): SessionMeta {
     attached: frame.attached,
     takenOver: frame.takenOver,
     question: frame.question,
+    prompt: frame.prompt,
     exitNote: frame.exitNote,
     inputPrompt: frame.inputPrompt,
     readOnlyReason: frame.readOnlyReason,

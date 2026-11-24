@@ -46,6 +46,30 @@ const SHELL_MAX_MS = 600_000;
 const OTHER_TOOL_MS = 10 * 60_000;
 
 /**
+ * What a call that waits on the person asks: AskUserQuestion's questions with their choices, or the plan
+ * ExitPlanMode wants approved. Kept on the step until the answer comes back.
+ */
+export function askOf(name: string, input: unknown): Pick<TranscriptMessage, "ask"> {
+  const args = (input ?? {}) as Record<string, unknown>;
+  const text = (value: unknown) => (typeof value === "string" ? value : "");
+  if (name === "AskUserQuestion" && Array.isArray(args.questions)) {
+    const questions = (args.questions as Array<Record<string, unknown>>)
+      .filter((item) => item && typeof item === "object" && text(item.question))
+      .map((item) => ({
+        ...(text(item.header) ? { header: text(item.header) } : {}),
+        question: text(item.question),
+        options: (Array.isArray(item.options) ? (item.options as Array<Record<string, unknown>>) : [])
+          .filter((option) => option && text(option.label))
+          .map((option) => ({ label: text(option.label), ...(text(option.description) ? { description: text(option.description) } : {}) })),
+        ...(item.multiSelect === true ? { multiSelect: true } : {}),
+      }));
+    return questions.length ? { ask: { kind: "question", questions } } : {};
+  }
+  if (name === "ExitPlanMode") return { ask: { kind: "plan", questions: [], ...(text(args.plan) ? { plan: text(args.plan) } : {}) } };
+  return {};
+}
+
+/**
  * How long a call can take by its own rules before it has to answer, or null when nothing bounds it: a sub-agent
  * works as long as its task needs, and a question waits on the person.
  */
@@ -215,7 +239,10 @@ export function parseClaudeJsonl(fileName: string, content: string, updatedAt: s
     // Calls that never got a result (the round was interrupted) stop spinning.
     for (const call of calls.values()) {
       const step = messages[call.at];
-      if (step?.result?.status === "running") step.result = { status: "error", summary: "Interrupted" };
+      if (step?.result?.status === "running") {
+        step.result = { status: "error", summary: "Interrupted" };
+        delete step.ask;
+      }
     }
     calls.clear();
     round = null;
@@ -249,7 +276,9 @@ export function parseClaudeJsonl(fileName: string, content: string, updatedAt: s
         let result = toolResult(call.name, call.input, block as Record<string, unknown>, record.toolUseResult, cwd);
         // The terminal shows the list itself under a todo update, not the tool's acknowledgement.
         if (call.todos && result.status === "ok") result = { status: "ok", todos: call.todos };
-        messages[call.at] = { ...messages[call.at], result };
+        // Answered: what it asked is in the result now.
+        const { ask: _answered, ...step } = messages[call.at];
+        messages[call.at] = { ...step, result };
       }
       // Claude Code's own notes ("the command below was run directly…") are not something the person said.
       // A message sent from MirrorMix arrives through Claude's inbox and is stored as a meta record too, but it is the
@@ -334,6 +363,7 @@ export function parseClaudeJsonl(fileName: string, content: string, updatedAt: s
             ...(header.server ? { server: header.server } : {}),
             text: header.text,
             result: { status: "running" },
+            ...askOf(block.name, block.input),
           });
           if (block.id) calls.set(block.id, call);
         }

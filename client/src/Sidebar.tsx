@@ -136,6 +136,10 @@ const SessionRow = memo(function SessionRow({
           <Spinner />
         ) : label ? (
           <span className={`session-state is-${session.status}`}>{label}</span>
+        ) : session.asking ? (
+          <span className="session-state is-asking" title="它在等你确认或选择">
+            等你确认
+          </span>
         ) : session.working ? (
           <span className="session-state is-running">
             <BusyIcon />
@@ -177,7 +181,7 @@ const SessionCard = memo(function SessionCard({
   return (
     <button
       type="button"
-      className={`home-card${live ? " is-live" : " is-waiting"}${current ? " is-current" : ""}`}
+      className={`home-card${session.asking ? " is-asking" : live ? " is-live" : " is-waiting"}${current ? " is-current" : ""}`}
       aria-current={current ? "true" : undefined}
       onClick={() => onChoose(session.id)}
     >
@@ -197,6 +201,11 @@ const SessionCard = memo(function SessionCard({
       <span className="home-card-state">
         {loading ? (
           <Spinner />
+        ) : session.asking ? (
+          <>
+            <span className="asking-dot" aria-hidden="true" />
+            等你确认，点开回答
+          </>
         ) : live ? (
           <>
             <BusyIcon label="正在回复" />
@@ -775,8 +784,13 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
                   .flatMap(({ tool: item, rows }) =>
                     rows.map((row) => ({ tool: item, ...row })),
                   )
+                  // Waiting on the person first: nothing moves until they answer.
                   .sort((a, b) =>
-                    a.session.working !== b.session.working
+                    Boolean(a.session.asking) !== Boolean(b.session.asking)
+                      ? a.session.asking
+                        ? -1
+                        : 1
+                      : a.session.working !== b.session.working
                       ? a.session.working
                         ? -1
                         : 1
