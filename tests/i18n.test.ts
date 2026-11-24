@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { browserLanguage, i18n, resolveLanguage, setLanguage } from "../client/src/i18n";
+import { activeLanguage, browserLanguage, i18n, resolveLanguage, setLanguage } from "../client/src/i18n";
 
 describe("interface language", () => {
   it("uses Chinese for every zh browser locale", () => {
@@ -22,5 +22,10 @@ describe("interface language", () => {
     expect(i18n.t("settings.generalTitle")).toBe("General settings");
     await setLanguage("zh-CN");
     expect(i18n.t("settings.generalTitle")).toBe("通用设置");
+  });
+
+  it("uses the live i18next language for the selected language control", () => {
+    expect(activeLanguage("en-US")).toBe("en");
+    expect(activeLanguage("zh-CN")).toBe("zh-CN");
   });
 });

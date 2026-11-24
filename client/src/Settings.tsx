@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import "./i18n";
+import { activeLanguage } from "./i18n";
 import { ALL_TOOLS, type ToolId, type ToolPrefs } from "./api";
 import { HelpContent } from "./Help";
 import { ModelManager } from "./Models";
@@ -99,7 +99,7 @@ export function SettingsDialog({
   onCheck: () => void;
   onClose: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const closeButton = useRef<HTMLButtonElement>(null);
   const [theme, setTheme] = useTheme();
   const [section, setSection] = useState<Section>(startAt === "market" || startAt === "help" ? startAt : "general");
@@ -229,7 +229,7 @@ export function SettingsDialog({
       <div className="setting-control">
         <div className="theme-choice language-choice" role="radiogroup" aria-label={t("settings.language")}>
           {(["zh-CN", "en"] as const).map((language) => {
-            const selected = (prefs?.language ?? (navigator.language.toLowerCase().startsWith("zh") ? "zh-CN" : "en")) === language;
+            const selected = activeLanguage(i18n.resolvedLanguage ?? i18n.language) === language;
             return <button key={language} type="button" role="radio" aria-checked={selected} className={selected ? "active" : ""} onClick={() => onLanguageChange(language)}>{language === "zh-CN" ? t("common.chinese") : t("common.english")}</button>;
           })}
         </div>

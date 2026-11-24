@@ -14,6 +14,11 @@ export function resolveLanguage(saved: UiLanguage | undefined, detected: UiLangu
   return saved ?? detected;
 }
 
+/** i18next may expose a regional match such as en-US; the UI has only two choices. */
+export function activeLanguage(value: string | undefined): UiLanguage {
+  return value?.toLowerCase().startsWith("zh") ? "zh-CN" : "en";
+}
+
 void i18n.use(initReactI18next).init({
   resources: { en: { translation: en }, "zh-CN": { translation: zhCN } },
   lng: browserLanguage(),
