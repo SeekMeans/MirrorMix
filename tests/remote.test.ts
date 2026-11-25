@@ -74,6 +74,12 @@ const filled = () => ({
 });
 
 describe("frpc settings", () => {
+  it("does not expose the server and bundled frpc implementation detail in the settings UI", () => {
+    const source = readFileSync(path.join(process.cwd(), "client", "src", "Remote.tsx"), "utf8");
+    expect(source).not.toContain("由 MirrorMix 内置 frpc.exe 自动连接");
+    expect(source).not.toContain("connected by MirrorMix's built-in frpc.exe");
+  });
+
   it("logs in as this PC's own frp user and writes one http proxy under its subdomain", () => {
     const config: RemoteConfig & RemoteServer = {
       enabled: true,

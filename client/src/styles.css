@@ -2050,6 +2050,7 @@ body.is-resizing-x iframe { pointer-events: none; }
   padding: 22px 0;
   border-bottom: 1px solid var(--line-soft);
 }
+.setting.is-inline-control { grid-template-columns: minmax(0, 1fr) auto; }
 
 .setting:last-child { border-bottom: 0; }
 
@@ -2128,6 +2129,7 @@ body.is-resizing-x iframe { pointer-events: none; }
   .settings-head { padding: 16px 14px 14px 18px; }
   .settings-body { padding: 4px 18px 20px; }
   .setting { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .setting.is-inline-control { grid-template-columns: minmax(0, 1fr); }
   .setting-control { justify-content: flex-start; }
 }
 
@@ -2626,8 +2628,6 @@ body.is-resizing-x iframe { pointer-events: none; }
 .remote-fields input::placeholder { color: var(--faint); }
 
 .remote-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
-.remote-preview { min-width: 0; color: var(--muted); font-family: var(--mono); font-size: 12.5px; overflow-wrap: anywhere; }
-
 @media (max-width: 760px) {
   .remote-fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .remote-fields label:first-child { grid-column: 1 / -1; }

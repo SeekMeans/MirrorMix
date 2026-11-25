@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { tr, uiLocale, useLanguage, type UiLanguage } from "./i18n";
 import { ALL_TOOLS, type ToolId, type ToolPrefs } from "./api";
-import { HelpContent } from "./Help";
 import { ModelManager } from "./Models";
 import {
   BackIcon,
@@ -10,7 +9,6 @@ import {
   ComputerIcon,
   ContrastIcon,
   GlobeIcon,
-  HelpIcon,
   LeaveIcon,
   Mark,
   ModelIcon,
@@ -26,23 +24,21 @@ import { PLUGINS, PluginMarket, type PluginId } from "./Plugins";
 import { THEME_LABEL, useTheme, type Theme } from "./theme";
 import { WORKFLOWS_SHOWN } from "./features";
 
-export type Section = "general" | "models" | "market" | "help";
+export type Section = "general" | "tools" | "remote" | "models" | "market";
 
 const HEADINGS = (): Record<Section, { title: string; lead: string }> => ({
   general: {
     title: tr("通用设置", "General settings"),
-    lead: tr(
-      "选择界面语言和要显示的 AI 工具，查看它们在本机是否开启，选择浅色或深色，设置外网访问。",
-      "Choose the interface language and which AI tools to show, check whether they are open on this computer, choose a theme, and set up remote access.",
-    ),
+    lead: "",
   },
+  tools: { title: tr("AI 工具", "AI tools"), lead: "" },
+  remote: { title: tr("外网访问", "Remote access"), lead: "" },
   models: { title: tr("模型管理", "Models"), lead: "" },
   market: { title: tr("插件市场", "Plugin market"), lead: tr("把需要的插件添加到“我的插件”，从左下角的菜单打开使用。", "Add the plugins you need to My plugins, then open them from the menu at the bottom left.") },
-  help: { title: tr("帮助", "Help"), lead: tr("MirrorMix 每个功能怎么用，以及常见问题。", "How each MirrorMix feature works, and common questions.") },
 });
 
 /** On a phone, settings open as a menu; each entry is a page of its own. */
-export type MenuPage = "tools" | "appearance" | "remote" | "models" | "market" | "help";
+export type MenuPage = "tools" | "appearance" | "remote" | "models" | "market";
 
 const PAGES = (): Record<MenuPage, { title: string; lead: string; Icon: () => ReactNode }> => {
   const headings = HEADINGS();
@@ -56,19 +52,16 @@ const PAGES = (): Record<MenuPage, { title: string; lead: string; Icon: () => Re
     remote: { title: tr("外网访问", "Remote access"), lead: "", Icon: GlobeIcon },
     models: { title: headings.models.title, lead: headings.models.lead, Icon: ModelIcon },
     market: { title: headings.market.title, lead: tr("把需要的插件添加到“我的插件”，在底部的“插件”页打开使用。", "Add the plugins you need to My plugins, then open them from the Plugins tab at the bottom."), Icon: StoreIcon },
-    help: { title: headings.help.title, lead: headings.help.lead, Icon: HelpIcon },
   };
 };
 
-const MENU_PAGES: MenuPage[] = ["tools", "appearance", "remote", "models", "market", "help"];
+const MENU_PAGES: MenuPage[] = ["tools", "appearance", "remote", "models", "market"];
 
 /** Each language is named in its own words, so it can be found whichever language the page is in. */
 const LANGUAGES: { id: UiLanguage; label: string }[] = [
   { id: "zh-CN", label: "中文" },
   { id: "en", label: "English" },
 ];
-
-const MENU: MenuPage[] = ["tools", "appearance", "remote", "help"];
 
 const toolNote = (): Record<ToolId, string> => ({
   claude: tr("Claude 桌面客户端", "Claude desktop app"),
@@ -124,7 +117,7 @@ export function SettingsDialog({
   const notes = toolNote();
   const closeButton = useRef<HTMLButtonElement>(null);
   const [theme, setTheme] = useTheme();
-  const [section, setSection] = useState<Section>(startAt === "market" || startAt === "help" ? startAt : "general");
+  const [section, setSection] = useState<Section>(startAt && ["tools", "remote", "models", "market"].includes(startAt) ? startAt as Section : "general");
   const page = variant === "page";
 
   // A phone page opened from the menu is a history entry, so the back gesture returns to the menu.
@@ -223,7 +216,7 @@ export function SettingsDialog({
         </ul>
       </div>
 
-      <div className="setting">
+      <div className="setting is-inline-control">
         <div className="setting-label">
           <h3>{tr("连通性检测", "Connection check")}</h3>
           <p>
@@ -259,7 +252,6 @@ export function SettingsDialog({
     <div className="setting">
       <div className="setting-label">
         <h3>{languageLabel}</h3>
-        <p>{tr("选择 MirrorMix 界面的显示语言。保存在这台电脑上，手机和电脑都用这个语言。", "Choose the language MirrorMix shows. It is saved on this computer, so a phone and a computer both use it.")}</p>
       </div>
       <div className="setting-control">
         <div className="theme-choice" role="radiogroup" aria-label={languageLabel}>
@@ -270,11 +262,6 @@ export function SettingsDialog({
     <div className="setting">
       <div className="setting-label">
         <h3>{tr("外观", "Appearance")}</h3>
-        <p>
-          {page
-            ? tr("跟随系统时，手机切换深色模式这里也跟着变。", "When it follows the system, switching the phone to dark mode changes it here too.")
-            : tr("只影响这个浏览器，手机和电脑可以各选各的。", "It only affects this browser, so a phone and a computer can each have their own.")}
-        </p>
       </div>
       <div className="setting-control">
         <div className="theme-choice" role="radiogroup" aria-label={tr("外观", "Appearance")}>
@@ -321,7 +308,6 @@ export function SettingsDialog({
       remote: tr("从手机或别的电脑打开", "Open from a phone or another computer"),
       models: tr("工作流可以调用的模型", "Models workflows can use"),
       market: installed ? tr(`已添加 ${installed.length} / ${PLUGINS.length} 个插件`, `${installed.length} of ${PLUGINS.length} plugins added`) : tr("正在读取", "Loading"),
-      help: tr("功能说明和常见问题", "How things work, and common questions"),
     };
 
     const online = prefs ? prefs.tools.filter((tool) => prefs.status[tool]?.running).length : 0;
@@ -352,7 +338,7 @@ export function SettingsDialog({
                     ? market
                     : sub === "models"
                       ? <ModelManager />
-                      : <HelpContent />}
+                      : null}
           </div>
         </section>
       );
@@ -391,7 +377,29 @@ export function SettingsDialog({
           </section>
 
           <div className="pref-group">
+            {/* Three choices fit in the row: switched here, no page to open. */}
+            <div className="pref-row is-static">
+              <span className="pref-icon"><ContrastIcon /></span>
+              <span className="pref-title">{tr("外观", "Appearance")}</span>
+              <span className="pref-segment" role="radiogroup" aria-label={tr("外观", "Appearance")}>
+                {(["system", "light", "dark"] as Theme[]).map((option) => (
+                  <button key={option} type="button" role="radio" aria-checked={theme === option} className={theme === option ? "is-on" : ""} onClick={() => setTheme(option)}>
+                    {THEME_LABEL()[option]}
+                  </button>
+                ))}
+              </span>
+            </div>
+            {/* The language sits under 外观 and is switched the same way, in the row itself. */}
+            <div className="pref-row is-static">
+              <span className="pref-icon"><SlidersIcon /></span>
+              <span className="pref-title">{languageLabel}</span>
+              <span className="pref-segment" role="radiogroup" aria-label={languageLabel}>
+                {languageButtons("is-on")}
+              </span>
+            </div>
+            {/* AI tools and remote access sit under the language row on a phone. */}
             <button type="button" className="pref-row" onClick={() => openSub("tools")}>
+              <span className="pref-icon"><ComputerIcon /></span>
               <span className="pref-title">{tr("AI 工具", "AI tools")}</span>
               <span className="pref-marks" aria-label={summary.tools}>
                 {(prefs?.tools ?? []).map((tool) => (
@@ -404,24 +412,12 @@ export function SettingsDialog({
                 <ChevronIcon />
               </span>
             </button>
-            {/* Three choices fit in the row: switched here, no page to open. */}
-            <div className="pref-row is-static">
-              <span className="pref-title">{tr("外观", "Appearance")}</span>
-              <span className="pref-segment" role="radiogroup" aria-label={tr("外观", "Appearance")}>
-                {(["system", "light", "dark"] as Theme[]).map((option) => (
-                  <button key={option} type="button" role="radio" aria-checked={theme === option} className={theme === option ? "is-on" : ""} onClick={() => setTheme(option)}>
-                    {THEME_LABEL()[option]}
-                  </button>
-                ))}
-              </span>
-            </div>
-            {/* The language sits under 外观 and is switched the same way, in the row itself. */}
-            <div className="pref-row is-static">
-              <span className="pref-title">{languageLabel}</span>
-              <span className="pref-segment" role="radiogroup" aria-label={languageLabel}>
-                {languageButtons("is-on")}
-              </span>
-            </div>
+            <button type="button" className="pref-row" onClick={() => openSub("remote")}>
+              <span className="pref-icon"><GlobeIcon /></span>
+              <span className="pref-title">{PAGES().remote.title}</span>
+              <span className="pref-value">{summary.remote}</span>
+              <span className="pref-caret"><ChevronIcon /></span>
+            </button>
           </div>
 
           {/* Each added plugin is a row of its own, opened straight from here; the market adds more. */}
@@ -453,7 +449,7 @@ export function SettingsDialog({
           )}
 
           <div className="pref-group">
-            {((WORKFLOWS_SHOWN ? ["models", "help"] : ["help"]) as MenuPage[]).map((key) => {
+            {(WORKFLOWS_SHOWN ? (["models"] as MenuPage[]) : []).map((key) => {
               const { title, Icon } = PAGES()[key];
               return (
                 <button key={key} type="button" className="pref-row" onClick={() => openSub(key)}>
@@ -476,19 +472,19 @@ export function SettingsDialog({
 
   const body = (
     <div className="settings-body">
-      {section === "help" ? (
-        <HelpContent />
+      {section === "tools" ? (
+        <>
+          {error && <p className="banner is-warning">{error}</p>}
+          {tools}
+        </>
+      ) : section === "remote" ? (
+        remote
       ) : section === "models" && WORKFLOWS_SHOWN ? (
         <ModelManager />
       ) : section === "market" ? (
         market
       ) : (
-        <>
-          {error && <p className="banner is-warning">{error}</p>}
-          {tools}
-          {appearance}
-          {remote}
-        </>
+        appearance
       )}
     </div>
   );
@@ -518,9 +514,10 @@ export function SettingsDialog({
             <Mark />
             <span>MirrorMix</span>
           </div>
+          {tab("tools", ComputerIcon, tr("AI 工具", "AI tools"))}
           {tab("general", SlidersIcon, tr("通用设置", "General"))}
+          {tab("remote", GlobeIcon, tr("外网访问", "Remote access"))}
           {WORKFLOWS_SHOWN && tab("models", ModelIcon, tr("模型管理", "Models"))}
-          {tab("help", HelpIcon, tr("帮助", "Help"))}
         </nav>
 
         <div className="settings-main">

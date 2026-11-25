@@ -6,7 +6,7 @@
 
 **Architecture:** Inno Setup builds `MirrorMix-Setup-*.exe` from a staging tree prepared by `deploy/build.ps1`. Staging holds the app (`dist/`, `src/`, production `node_modules` plus `tsx`), optional `frpc.exe`, and `MirrorMixPanel.exe`. The panel starts `node node_modules/tsx/dist/cli.mjs src/server/main.ts` with cwd = install root, polls `http://127.0.0.1:<port>/`, then opens the default browser. The entire `deploy/` directory is gitignored; only `.gitignore` / README notes are tracked.
 
-**Tech Stack:** PowerShell, Inno Setup 6, C# WinForms (.NET 8 `net8.0-windows`), Node 22+, existing MirrorMix server.
+**Tech Stack:** PowerShell, Inno Setup 7, C# WinForms (.NET 11 `net11.0-windows`), Node 22+, existing MirrorMix server.
 
 ## Global Constraints
 
@@ -121,7 +121,7 @@ Expected: a line citing `.gitignore` and `deploy/`.
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net11.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWindowsForms>true</UseWindowsForms>
@@ -349,7 +349,7 @@ Before file removal, `[Code] CurUninstallStepChanged` on `usUninstall`: try `tas
 After Task 5 produces staging, run:
 
 ```powershell
-& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" E:\Me\AIMiss\deploy\MirrorMix.iss
+& "$env:ProgramFiles\Inno Setup 7\ISCC.exe" E:\Me\AIMiss\deploy\MirrorMix.iss
 ```
 
 Expected: `deploy\out\MirrorMix-Setup-0.1.0.exe`.
@@ -375,7 +375,7 @@ $Root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $Deploy = $PSScriptRoot
 $Staging = Join-Path $Deploy "staging"
 $OutPanel = Join-Path $Deploy "panel\publish"
-$Iscc = Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"
+$Iscc = Join-Path $env:ProgramFiles "Inno Setup 7\ISCC.exe"
 
 function Require-Cmd($name) {
   if (-not (Get-Command $name -ErrorAction SilentlyContinue)) {
@@ -386,7 +386,7 @@ function Require-Cmd($name) {
 Require-Cmd node
 Require-Cmd npm
 Require-Cmd dotnet
-if (-not (Test-Path $Iscc)) { throw "Inno Setup 6 not found at $Iscc. Install from https://jrsoftware.org/isinfo.php" }
+if (-not (Test-Path $Iscc)) { throw "Inno Setup 7 not found at $Iscc. Install from https://jrsoftware.org/isinfo.php" }
 
 $ver = node -v
 if ($ver -notmatch 'v?(?<m>\d+)') { throw "Cannot parse node version: $ver" }

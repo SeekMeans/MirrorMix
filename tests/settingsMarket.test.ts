@@ -73,4 +73,23 @@ describe("settings", () => {
     expect(settings("dialog")).not.toContain("通过你的服务器");
     expect(settings("dialog")).not.toContain("打开的工具会显示");
   });
+
+  it("shows AI tools and remote access as peer settings sections", () => {
+    const page = settings("dialog");
+    expect(page).toContain("General</button>");
+    expect(page).toContain("AI tools</button>");
+    expect(page).toContain("Remote access</button>");
+    expect(page).not.toContain("Connection check");
+  });
+
+  it("puts AI tools and remote access under the language row on a phone", async () => {
+    await setLanguage("zh-CN");
+    const page = settings("page");
+    const language = page.indexOf('<span class="pref-title">语言</span>');
+    const tools = page.indexOf('<span class="pref-title">AI 工具</span>');
+    const remote = page.indexOf('<span class="pref-title">外网访问</span>');
+    expect(language).toBeGreaterThan(-1);
+    expect(tools).toBeGreaterThan(language);
+    expect(remote).toBeGreaterThan(tools);
+  });
 });

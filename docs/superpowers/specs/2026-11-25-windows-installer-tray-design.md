@@ -100,8 +100,8 @@
 ## 打包机依赖
 
 - Node.js 22+、npm
-- Inno Setup 6（`ISCC.exe` 在 PATH 或由脚本配置路径）
-- .NET SDK（足以 `dotnet publish` 出 win-x64 托盘 exe；优先单文件、框架依赖或自包含在实现时按体积权衡）
+- Inno Setup 7（默认 `C:\Program Files\Inno Setup 7\ISCC.exe`，或由脚本探测）
+- .NET 11 SDK（`net11.0-windows`，足以 `dotnet publish` 出 win-x64 托盘 exe；优先单文件、框架依赖或自包含在实现时按体积权衡）
 
 `deploy/build.ps1` 在缺工具时打印明确安装说明并失败退出。
 

@@ -304,9 +304,6 @@ export function RemotePanel() {
           </div>
 
           <div className="remote-actions">
-            <p className="remote-preview">
-              {tr(`服务器 ${view.server}:${view.serverPort}，由 MirrorMix 内置 frpc.exe 自动连接`, `Server ${view.server}:${view.serverPort}, connected by MirrorMix's built-in frpc.exe`)}
-            </p>
             <button type="submit" className="quiet-button" disabled={saving}>
               {saving && <Spinner />}
               {saving ? tr("正在保存", "Saving") : saved ? tr("已保存", "Saved") : tr("保存并重新连接", "Save and reconnect")}

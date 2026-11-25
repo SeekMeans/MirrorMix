@@ -20,6 +20,7 @@ import {
   CloseIcon,
   ComputerIcon,
   GearIcon,
+  HelpIcon,
   HomeIcon,
   LeaveIcon,
   PushpinIcon,
@@ -238,6 +239,7 @@ export interface SidebarProps {
   /** Tools whose app is not open on this machine; they are listed but cannot be entered. */
   offlineTools: ToolId[];
   onSettings: () => void;
+  onHelp?: () => void;
   /** 我的插件, from the left bar just above the menu. */
   onPlugins?: () => void;
   /** Desktop: opens 工作流, the page beside the bar. */
@@ -627,6 +629,18 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
                 >
                   <GearIcon />
                   <span>{tr("设置", "Settings")}</span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="foot-button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    props.onHelp?.();
+                  }}
+                >
+                  <HelpIcon />
+                  <span>{tr("帮助", "Help")}</span>
                 </button>
                 {props.onLogout && (
                   <button

@@ -17,6 +17,7 @@ import { WORKFLOWS_SHOWN } from "./features";
 import { SettingsDialog, type MenuPage, type Section } from "./Settings";
 import { Sidebar, type RailView } from "./Sidebar";
 import { TodayStats } from "./TodayStats";
+import { HelpDialog } from "./HelpDialog";
 import { isWorkbenchQuiet } from "./workbench";
 import { errorText, oneLine, toolName } from "./text";
 import { useFinished } from "./useFinished";
@@ -25,7 +26,7 @@ import { useSession, type SessionState } from "./useSession";
 import { browserLanguage, currentLanguage, resolveLanguage, setLanguage, tr, useLanguage } from "./i18n";
 
 /** On a phone one screen shows at a time. The conversation is pushed on top of the list and has no tab bar. */
-type Screen = "list" | "chat" | "plugins" | "settings" | "workflows";
+type Screen = "list" | "chat" | "plugins" | "settings" | "workflows" | "help";
 
 type Tone = "busy" | "ready" | "working" | "attention" | "off";
 
@@ -104,6 +105,7 @@ export function App({ onLogout }: { onLogout?: () => void }) {
   const [railOpen, setRailOpen] = useState(false);
   const [prefs, setPrefs] = useState<ToolPrefs | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [pluginsOpen, setPluginsOpen] = useState(false);
   // Desktop: 工作流 open beside the bar, in place of the session list and conversation.
   const [workflowsOpen, setWorkflowsOpen] = useState(false);
@@ -702,6 +704,7 @@ export function App({ onLogout }: { onLogout?: () => void }) {
         tools={shownTools}
         offlineTools={offlineTools}
         onSettings={openSettings}
+        onHelp={() => mobile ? setScreen("help") : setHelpOpen(true)}
         onPlugins={() => {
           setWorkflowsOpen(false);
           setPluginsOpen(true);
@@ -999,6 +1002,8 @@ export function App({ onLogout }: { onLogout?: () => void }) {
         <PluginsDialog key={pluginStart ?? "list"} variant="page" startWith={pluginStart} installed={installed} context={{ jobs, placeOf, mobile: true }} onOpenMarket={openMarket} onClose={leavePlugins} />
       )}
 
+      {mobile && screen === "help" && <HelpDialog variant="page" onClose={() => setScreen("list")} />}
+
       {WORKFLOWS_SHOWN && mobile && screen === "workflows" && <Workflows variant="page" catalog={catalog} tools={shownTools} onOpenSession={chooseIn} />}
 
       {mobile && screen === "settings" && (
@@ -1083,6 +1088,8 @@ export function App({ onLogout }: { onLogout?: () => void }) {
           onClose={closeSettings}
         />
       )}
+
+      {!mobile && helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
 
     </div>
   );
