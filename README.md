@@ -1,30 +1,54 @@
-# MirrorMix
+![MirrorMix — local workspace for Claude Code, Codex, and Cursor sessions](docs/readme-banner.svg)
 
-[中文说明](README.zh-CN.md)
+<p align="center">
+  <strong>Pick up your existing AI chats in the browser.</strong><br />
+  One local workspace for Claude Code, Codex, and Cursor.
+</p>
 
-A local desk for sessions already on your machine. Open Claude Code, Codex, and Cursor chats in the browser and keep typing there. MirrorMix does **not** call model APIs; it reads and writes each tool’s own local records and talks to the desktop apps when needed.
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue" alt="MIT license" /></a>
+  <img src="https://img.shields.io/badge/Platform-Windows-2563eb" alt="Windows" />
+  <img src="https://img.shields.io/badge/Node.js-22%2B-287a4b" alt="Node.js 22 or later" />
+</p>
 
-Default URL: <http://127.0.0.1:4789>
+<p align="center">
+  <strong>English</strong> · <a href="README.zh-CN.md">简体中文</a>
+</p>
 
-Requires **Node.js 22+** (uses `node:sqlite`).
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#connection-mode">Connection mode</a> ·
+  <a href="#security">Security</a>
+</p>
 
-## Features
+## Overview
 
-- Browse and continue Claude Code, Codex, and Cursor sessions on this PC
-- Send from the web UI into the desktop window when possible; fall back to CLI / queue paths when the screen is locked or the window cannot take input
-- Shared project terminals per workspace folder, global shortcut commands, plugins (command tasks, schedules, SSH)
-- Named project services in the terminal, with suggested start commands and per-service start, stop and restart
-- Read-only Codex paginated SQLite history alongside JSONL transcripts
-- Optional remote access via your own tunnel or reverse proxy (still bound to localhost on the app side)
+Open a conversation already on your PC and send your next message without starting a new chat. MirrorMix works with the tools and session records already on your machine. **It does not call model APIs directly.**
 
 ## Quick start
 
+On Windows with **Node.js 22+**, run in PowerShell:
+
 ```powershell
+git clone https://github.com/tnndworlds/MirrorMix.git
+cd MirrorMix
 npm install
 npm start
 ```
 
-`npm start` builds the client, then starts the server. When you see `MirrorMix listening on http://127.0.0.1:4789`, open that address in a browser.
+`npm start` builds the client and starts the server. Open <http://127.0.0.1:4789> in your browser, then select an existing session.
+
+## Features
+
+- Browse and continue Claude Code, Codex, and Cursor sessions on this PC.
+- Read Codex JSONL transcripts and paginated SQLite history, and display project names from the Codex desktop sidebar.
+- Send through the desktop window when available, with CLI or queue fallback paths depending on the tool and connection mode.
+- Open shared project terminals, run shortcuts, and use plugins for commands, schedules, and SSH.
+- Start, stop, or restart named services from the project terminal.
+- Optionally reach MirrorMix through your own tunnel or reverse proxy while keeping the app bound to localhost.
+
+## Development
 
 Development (server hot-reload):
 

@@ -1,31 +1,54 @@
-# MirrorMix
+![MirrorMix：Claude Code、Codex 和 Cursor 的本地会话工作台](docs/readme-banner.svg)
 
-[English](README.md)
+<p align="center">
+  <strong>不用重开会话，在浏览器里接着聊。</strong><br />
+  一个本地工作台，继续 Claude Code、Codex 和 Cursor 的已有会话。
+</p>
 
-本机的会话台。打开 Claude Code、Codex、Cursor 里已有的会话，在浏览器里接着写。MirrorMix **不调用模型接口**，只读写这三个工具在本机上的记录，并在需要时操作桌面端窗口。
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue" alt="MIT 许可证" /></a>
+  <img src="https://img.shields.io/badge/Platform-Windows-2563eb" alt="Windows" />
+  <img src="https://img.shields.io/badge/Node.js-22%2B-287a4b" alt="Node.js 22 或更新版本" />
+</p>
 
-默认地址：<http://127.0.0.1:4789>
+<p align="center">
+  <a href="README.md">English</a> · <strong>简体中文</strong>
+</p>
 
-需要 **Node.js 22+**（使用 `node:sqlite`）。
+<p align="center">
+  <a href="#快速开始">快速开始</a> ·
+  <a href="#功能">功能</a> ·
+  <a href="#通信模式">通信模式</a> ·
+  <a href="#安全">安全</a>
+</p>
 
-## 功能
+## 简介
 
-- 浏览并继续本机上的 Claude Code、Codex、Cursor 会话
-- 同步 Codex JSONL 和桌面端分页 SQLite 历史（只读）
-- 同步 Codex 桌面侧栏的项目名称；自定义分区里的项目也会平铺显示
-- 尽量通过桌面窗口发送；锁屏或窗口无法输入时走 CLI / 队列等后备路径
-- 按工作区共享的项目终端、全局快捷命令、插件（命令任务、定时任务、SSH）
-- 在项目终端的「启动服务」中识别或配置启动命令，单独或批量启动、停止、重启
-- 可选：经你自己的隧道或反向代理做外网访问（应用本身仍只监听本机）
+打开电脑上已有的会话，直接发下一条消息。MirrorMix 使用本机已安装的工具和会话记录，**不直接调用模型 API**。
 
 ## 快速开始
 
+在装有 **Node.js 22+** 的 Windows 上，打开 PowerShell：
+
 ```powershell
+git clone https://github.com/tnndworlds/MirrorMix.git
+cd MirrorMix
 npm install
 npm start
 ```
 
-`npm start` 会先构建页面，再启动服务。终端出现 `MirrorMix listening on http://127.0.0.1:4789` 后，用浏览器打开该地址。
+`npm start` 会先构建页面，再启动服务。用浏览器打开 <http://127.0.0.1:4789>，选一个已有会话就能接着聊。
+
+## 功能
+
+- 浏览并继续本机上的 Claude Code、Codex 和 Cursor 会话。
+- 读取 Codex JSONL 和分页 SQLite 历史，显示 Codex 桌面侧栏的项目名称；自定义分区里的项目也会平铺显示。
+- 可用时通过桌面窗口发送；根据工具和通信模式，也可走 CLI 或队列等后备路径。
+- 按工作区共享项目终端，支持全局快捷命令以及命令任务、定时任务和 SSH 插件。
+- 在项目终端识别或配置服务启动命令，单独或批量启动、停止、重启。
+- 可选：经你自己的隧道或反向代理远程访问，应用本身仍只监听本机。
+
+## 开发
 
 开发模式（服务端热更新）：
 
