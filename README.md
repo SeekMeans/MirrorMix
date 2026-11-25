@@ -27,16 +27,28 @@ MirrorMix gives you access to your PC's development workspace from your phone. S
 - **Run repeatable maintenance and deployments.** Save a script and its target server as a task, such as updating a test environment or restarting a service. Tap **Run** on your phone and see the status and output without retyping commands.
 
 <p align="center">
-  <img src="docs/mobile-session.png" width="280" alt="MirrorMix on a phone, continuing an existing Codex session from the PC" />
+  <a href="docs/mobile-dashboard.png"><img src="docs/mobile-dashboard.png" width="130" alt="Mobile workspace showing today's activity" /></a>
+  <a href="docs/mobile-session.png"><img src="docs/mobile-session.png" width="110" alt="Continuing an existing Codex session on a phone" /></a>
 </p>
+<p align="center"><sub>Left: mobile workspace · Right: Codex session (select either image to enlarge)</sub></p>
 
 ## Connect your phone
 
-Once MirrorMix is running on your Windows PC, all you need on your phone is a browser:
+Start MirrorMix on your Windows PC, then choose how to reach it from your phone:
 
-1. **Request an access address.** Apply in the MirrorMix mini program. Once approved, it shows a subdomain and a connection token.
-2. **Enable access on your PC.** In MirrorMix, go to **Settings → General → Remote access**. Enter the subdomain and token, save, and wait for **Connected**.
-3. **Pick up on your phone.** Open your HTTPS access address and sign in with the PC's Windows account. Open an existing chat, or go to **Plugins → SSH** to work on a server.
+- **Have a cloud server? Run your own tunnel.** Use your server to relay traffic from an HTTPS address to MirrorMix on your Windows PC. No mini program application is needed.
+- **No cloud server? Request a port in the MirrorMix mini program.** Once approved, it shows a subdomain and a connection token. In MirrorMix on your PC, go to **Settings → General → Remote access**, enter both, save, and wait for **Connected**.
+
+Open your **HTTPS address** in your phone browser and sign in with the PC's Windows account. Open an existing chat, or go to **Plugins → SSH** to work on a server.
+
+<details>
+<summary>Self-hosted tunnel setup notes</summary>
+
+For example, run frps on your cloud server and point frpc on Windows at the local service on `127.0.0.1:4789`. Put an HTTPS reverse proxy on the cloud server, support WebSockets, and preserve the original `Host` (or pass the correct `X-Forwarded-Host`). If your proxy rewrites the host and doesn't forward the original, set `MIRRORMIX_ALLOWED_ORIGINS` to your browser-facing origin, such as `https://mm.example.com`, before starting MirrorMix.
+
+Do not expose the forwarded MirrorMix port directly to the internet. Use the HTTPS entry point and keep sign-in enabled.
+
+</details>
 
 **Before you leave:** Keep the PC on, online, and running MirrorMix. Keep sign-in enabled for remote access, and don't expose the local service directly to the internet.
 
@@ -129,15 +141,6 @@ tailscale serve --bg 4789
 ```
 
 Open `https://<machine>.<tailnet>.ts.net` from your phone on the same Tailscale account.
-
-#### Self-hosted tunnel
-
-Point frp/Caddy/nginx (or similar) at `127.0.0.1:4789`, terminate TLS on the server, and do not expose the raw tunnel port to the internet. If your public origin differs from what the browser uses, set:
-
-```powershell
-$env:MIRRORMIX_ALLOWED_ORIGINS = "https://mm.example.com"
-npm start
-```
 
 ### Config tips
 

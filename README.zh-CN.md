@@ -27,16 +27,28 @@ MirrorMix 把你电脑上的开发工作台带到手机。出门前让 Codex 开
 - **一键跑运维和部署任务。** 把常用脚本和目标服务器存成任务，例如更新测试环境或重启服务。之后在手机上点「执行」，就能看到状态和输出，不用再手敲一遍命令。
 
 <p align="center">
-  <img src="docs/mobile-session.png" width="280" alt="手机上的 MirrorMix：继续电脑上已有的 Codex 会话" />
+  <a href="docs/mobile-dashboard.png"><img src="docs/mobile-dashboard.png" width="130" alt="手机工作台：查看今日活动" /></a>
+  <a href="docs/mobile-session.png"><img src="docs/mobile-session.png" width="110" alt="手机会话：继续电脑上已有的 Codex 对话" /></a>
 </p>
+<p align="center"><sub>左：手机工作台 · 右：继续 Codex 会话（点击查看大图）</sub></p>
 
 ## 怎么连上手机
 
-如果 MirrorMix 已经在 Windows 电脑上运行，手机只需要浏览器：
+先在 Windows 电脑上运行 MirrorMix，再选一种方式开通手机访问：
 
-1. **申请访问地址。** 在 MirrorMix 小程序里申请。审核通过后，小程序会显示子域名和连接口令。
-2. **在电脑上开通。** 打开 MirrorMix 的「设置 → 通用设置 → 外网访问」，填入这两项，保存后等待显示「已连接」。
-3. **在手机上继续。** 用手机浏览器打开开通的 HTTPS 地址，用这台电脑的 Windows 账户登录。想继续聊，就点开已有会话；想操作服务器，就打开「插件 → SSH 连接」。
+- **有云主机：自己搭内网穿透。** 用自己的云主机做中转，将 HTTPS 地址转发到 Windows 电脑上的 MirrorMix。无需向小程序申请。
+- **没有云主机：用小程序申请端口。** 审核通过后，小程序会显示子域名和连接口令。在电脑端 MirrorMix 打开「设置 → 通用设置 → 外网访问」，填入这两项并保存，等待显示「已连接」。
+
+开通后，用手机浏览器打开对应的 **HTTPS 地址**，用这台电脑的 Windows 账户登录。想继续聊，就点开已有会话；想操作服务器，就打开「插件 → SSH 连接」。
+
+<details>
+<summary>自建内网穿透的配置要点</summary>
+
+例如用 frp：在云主机上运行 frps，Windows 上的 frpc 转发到本机的 `127.0.0.1:4789`。在云主机上用 HTTPS 反向代理作为入口，支持 WebSocket，并保留原始 `Host`（或传递正确的 `X-Forwarded-Host`）。如果代理改写了主机名且未转发原始主机名，在启动 MirrorMix 前设置 `MIRRORMIX_ALLOWED_ORIGINS` 为实际访问的地址，例如 `https://mm.example.com`。
+
+不要对公网开放转发后的 MirrorMix 端口；通过 HTTPS 入口访问，并保留登录保护。
+
+</details>
 
 **出门前记得：** 让电脑保持开机、联网，并让 MirrorMix 继续运行。外网访问请保留登录保护，不要把本地服务直接暴露到公网。
 
@@ -129,15 +141,6 @@ tailscale serve --bg 4789
 ```
 
 同一 Tailscale 账号下，手机打开 `https://电脑名.你的tailnet名.ts.net`。
-
-#### 自建隧道
-
-用 frp / Caddy / nginx 等把流量转到 `127.0.0.1:4789`，在服务器上终止 TLS，不要把隧道原始端口直接暴露到公网。若公网地址与浏览器访问地址不一致，启动前设置：
-
-```powershell
-$env:MIRRORMIX_ALLOWED_ORIGINS = "https://mm.example.com"
-npm start
-```
 
 ### 配置一览
 
