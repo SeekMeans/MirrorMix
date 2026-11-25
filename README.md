@@ -17,12 +17,17 @@ Requires **Node.js 22+** (uses `node:sqlite`).
 - Read-only Codex paginated SQLite history alongside JSONL transcripts
 - Optional remote access via your own tunnel or reverse proxy (still bound to localhost on the app side)
 
+## Windows installer
+
+Maintainers can build a Setup exe on Windows with the local (gitignored) `deploy/build.ps1` script. The installer does not bundle Node.js; it requires Node.js 22+ on the target machine and installs a tray panel to start/stop MirrorMix.
+
 ## Quick start
 
 ```powershell
 npm install
 npm start
 ```
+
 
 `npm start` builds the client, then starts the server. When you see `MirrorMix listening on http://127.0.0.1:4789`, open that address in a browser.
 

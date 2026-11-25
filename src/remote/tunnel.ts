@@ -1,5 +1,6 @@
 import { execFileSync, spawn as spawnProcess } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
@@ -42,17 +43,39 @@ export interface RemoteView extends RemoteConfig, RemoteServer {
   configFile: string;
   /** A connection token is saved. It is only sent to the page when asked for (the eye button). */
   hasToken: boolean;
+  /** An access password is set: what someone coming in through the public address signs in with. */
+  hasAccessPassword: boolean;
   status: RemoteStatus;
 }
 
 /** What the page may send. The token is only written when a new one is given. */
 export interface RemoteUpdate extends Partial<RemoteConfig> {
   token?: string;
+  /** A new access password. Only written when one is given. */
+  accessPassword?: string;
 }
 
 interface Stored extends RemoteConfig {
   /** The token, encrypted for this Windows account. */
   sealedToken: string;
+  /** The access password as "scrypt:<salt>:<hash>"; the password itself is never kept. */
+  accessHash?: string;
+}
+
+export const ACCESS_PASSWORD_MIN = 6;
+const ACCESS_PASSWORD_MAX = 256;
+
+export function hashAccessPassword(password: string): string {
+  const salt = randomBytes(16);
+  return `scrypt:${salt.toString("base64")}:${scryptSync(password, salt, 32).toString("base64")}`;
+}
+
+export function accessPasswordMatches(hash: string | undefined, password: string): boolean {
+  const [kind, salt, expected] = (hash ?? "").split(":");
+  if (kind !== "scrypt" || !salt || !expected || !password || password.length > ACCESS_PASSWORD_MAX) return false;
+  const want = Buffer.from(expected, "base64");
+  const got = scryptSync(password, Buffer.from(salt, "base64"), want.length);
+  return want.length > 0 && timingSafeEqual(want, got);
 }
 
 export interface FrpcProcess {
@@ -287,6 +310,10 @@ export interface Tunnel {
   previewOrigin(): string | null;
   /** The saved connection token in plain text, or null when none is saved or it cannot be read. */
   token(): string | null;
+  /** Whether an access password is set. */
+  hasAccessPassword(): boolean;
+  /** Whether this is the access password. False while none is set. */
+  checkAccess(password: string): boolean;
   dispose(): void;
 }
 
@@ -460,12 +487,13 @@ export function createTunnel(deps: TunnelDeps): Tunnel {
   };
 
   const view = (): RemoteView => {
-    const { sealedToken, ...config } = stored;
+    const { sealedToken, accessHash, ...config } = stored;
     return {
       ...config,
       ...shared,
       configFile: deps.configFile ?? "",
       hasToken: Boolean(sealedToken),
+      hasAccessPassword: Boolean(accessHash),
       status: { ...status, url: urlOf(stored), ...(retryAt && status.state !== "connected" ? { retryAt } : {}) },
     };
   };
@@ -489,6 +517,10 @@ export function createTunnel(deps: TunnelDeps): Tunnel {
     if (typeof change.token === "string" && change.token.trim()) {
       if (change.token.length > 512) throw new RemoteError("bad_token");
       next.sealedToken = seal(change.token.trim());
+    }
+    if (typeof change.accessPassword === "string" && change.accessPassword) {
+      if (change.accessPassword.length < ACCESS_PASSWORD_MIN || change.accessPassword.length > ACCESS_PASSWORD_MAX) throw new RemoteError("bad_access_password");
+      next.accessHash = hashAccessPassword(change.accessPassword);
     }
     if (change.enabled !== undefined) next.enabled = Boolean(change.enabled);
     const restart =
@@ -517,6 +549,8 @@ export function createTunnel(deps: TunnelDeps): Tunnel {
       const name = stored.enabled && deps.previewPort ? previewSubdomain(stored.subdomain) : null;
       return name ? `https://${name}.${shared.domain}` : null;
     },
+    hasAccessPassword: () => Boolean(stored.accessHash),
+    checkAccess: (password) => accessPasswordMatches(stored.accessHash, password),
     token: () => {
       if (!stored.sealedToken) return null;
       try {

@@ -1,10 +1,10 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
-import { tmpdir } from "node:os";
+import { hostname, tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { createCommandStore, prepareShortcut } from "../src/settings/commandStore";
+import { createCommandStore, defaultCommitMessage, prepareShortcut } from "../src/settings/commandStore";
 import { DEFAULT_SHORTCUTS } from "../src/shared/shortcuts";
 import { createApp, listenLocal } from "../src/server/app";
 import { createSupervisor } from "../src/process/supervisor";
@@ -51,9 +51,12 @@ describe("global command library", () => {
     expect(readFileSync(file, "utf8")).toBe("invalid JSON");
   });
 
-  it("defaults an empty message to new and never interpolates user text into shell code", () => {
+  it("defaults an empty message to the time and computer name and never interpolates user text into shell code", () => {
     const template = DEFAULT_SHORTCUTS[0].command;
-    expect(prepareShortcut(template, "")).toContain('"bmV3"');
+    const now = new Date(2026, 10, 24, 9, 5, 7);
+    expect(defaultCommitMessage(now, "DESKTOP-A1")).toBe("2026-11-24 09:05:07 DESKTOP-A1");
+    expect(defaultCommitMessage(now, "")).toBe("2026-11-24 09:05:07");
+    expect(prepareShortcut(template, "", undefined, now)).toContain(`"${Buffer.from(defaultCommitMessage(now), "utf8").toString("base64")}"`);
     const message = '更新 "A&B" %PATH% !test! | echo injected';
     const prepared = prepareShortcut(template, message);
     expect(prepared).toContain(Buffer.from(message, "utf8").toString("base64"));
@@ -89,12 +92,12 @@ describe("command library API", () => {
   it("requires login and same-origin writes, and prepares without executing", async () => {
     const f = fixture();
     const supervisor = createSupervisor({ bins: { claudeExe: "", codexJs: "", nodeExe: "" }, roots: { claudeProjectsDir: "", claudeDataDir: "", codexSessionsDir: "" }, listProcesses: () => [], spawn: () => { throw new Error("must not spawn"); } });
-    const server = createApp(supervisor, undefined, { verify: async () => true }, undefined, undefined, undefined, undefined, f.store);
+    const server = createApp(supervisor, undefined, { verify: async () => true, needsLogin: () => true }, undefined, undefined, undefined, undefined, f.store);
     await listenLocal(server, 0);
     const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
     try {
       expect((await fetch(`${base}/api/commands`)).status).toBe(401);
-      const login = await fetch(`${base}/api/login`, { method: "POST", headers: { "content-type": "application/json", origin: base }, body: JSON.stringify({ username: "fixture", password: "fixture" }) });
+      const login = await fetch(`${base}/api/login`, { method: "POST", headers: { "content-type": "application/json", origin: base }, body: JSON.stringify({ password: "fixture" }) });
       const cookie = login.headers.get("set-cookie")!.split(";")[0];
       const headers = { "content-type": "application/json", origin: base, cookie };
       const response = await fetch(`${base}/api/commands`, { headers });
@@ -104,7 +107,9 @@ describe("command library API", () => {
       expect(forged.status).toBe(403);
       const prepared = await fetch(`${base}/api/commands/prepare`, { method: "POST", headers, body: JSON.stringify({ ...library.commands[0], revision: library.revision, message: "" }) });
       expect(prepared.status).toBe(200);
-      expect((await prepared.json()).command).toContain('"bmV3"');
+      const filled = Buffer.from(/"([A-Za-z0-9+/=]+)" &&/.exec((await prepared.json()).command)![1], "base64").toString("utf8");
+      expect(filled).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/);
+      expect(filled).toContain(hostname());
       expect(existsSync(path.join(f.dir, ".git"))).toBe(false);
       const entries = [{ group: "通用", name: "目录", command: "cd" }];
       expect((await fetch(`${base}/api/commands`, { method: "PUT", headers, body: JSON.stringify({ commands: entries, revision: library.revision }) })).status).toBe(200);

@@ -25,7 +25,7 @@ async function desk() {
       throw new Error("not used");
     },
   });
-  const server = createApp(supervisor, undefined, { verify: async (user, pass) => user === "tester" && pass === "test-pass" });
+  const server = createApp(supervisor, undefined, { verify: async (pass) => pass === "test-pass", needsLogin: () => true });
   await listenLocal(server, 0);
   servers.push({ close: () => new Promise((resolve) => server.close(() => resolve())) });
   const port = (server.address() as AddressInfo).port;
@@ -36,7 +36,7 @@ const login = (base: string, headers: Record<string, string> = {}) =>
   fetch(`${base}/api/login`, {
     method: "POST",
     headers: { "content-type": "application/json", ...headers },
-    body: JSON.stringify({ username: "tester", password: "test-pass" }),
+    body: JSON.stringify({ password: "test-pass" }),
   });
 
 function cookieOf(response: Response): string {

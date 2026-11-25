@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { COMMIT_MESSAGE_TOKEN, DEFAULT_SHORTCUTS, type Shortcut, type ShortcutLibrary } from "../shared/shortcuts";
@@ -27,11 +28,19 @@ function validate(value: unknown): Shortcut[] {
   });
 }
 
+/** The message used when none is given: local time and this computer's name, e.g. "2026-11-24 15:30:05 DESKTOP-A1". */
+export function defaultCommitMessage(now = new Date(), host = os.hostname()): string {
+  const two = (value: number) => String(value).padStart(2, "0");
+  const stamp = `${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())} ${two(now.getHours())}:${two(now.getMinutes())}:${two(now.getSeconds())}`;
+  const name = host.replace(/[\x00-\x1f]/g, "").trim();
+  return name ? `${stamp} ${name}` : stamp;
+}
+
 /** Only prepares terminal input. Nothing is executed by the HTTP request. */
-export function prepareShortcut(command: string, message: unknown, nodeExe = process.execPath): string {
+export function prepareShortcut(command: string, message: unknown, nodeExe = process.execPath, now = new Date()): string {
   if (!command.includes(COMMIT_MESSAGE_TOKEN)) return command;
   if (message !== undefined && typeof message !== "string") throw new CommandError(400, "commands_message");
-  const text = (typeof message === "string" ? message.trim() : "") || "new";
+  const text = (typeof message === "string" ? message.trim() : "") || defaultCommitMessage(now);
   if (text.length > 1000 || /[\x00-\x1f]/.test(text)) throw new CommandError(400, "commands_message");
   const helper = fileURLToPath(new URL("../process/commitMessage.cjs", import.meta.url));
   if (/["%!\r\n]/.test(nodeExe + helper)) throw new CommandError(500, "commands_node_path");

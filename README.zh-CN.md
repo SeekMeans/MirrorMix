@@ -18,6 +18,10 @@
 - 在项目终端的「启动服务」中识别或配置启动命令，单独或批量启动、停止、重启
 - 可选：经你自己的隧道或反向代理做外网访问（应用本身仍只监听本机）
 
+## Windows 安装包
+
+维护者可在 Windows 上用本地（已被 gitignore）的 `deploy/build.ps1` 打出 Setup 安装包。安装包不内嵌 Node.js，目标机器需 Node.js 22+，并提供托盘面板启停 MirrorMix。
+
 ## 快速开始
 
 ```powershell

@@ -111,12 +111,12 @@ describe("desktop Codex transcripts", () => {
       bins: { claudeExe: "", nodeExe: "", codexJs: "" }, listProcesses: () => [],
       spawn() { throw new Error("history reads must not start a process"); },
     });
-    const server = createApp(supervisor, undefined, { verify: async (u, p) => u === "test" && p === "fixture" });
+    const server = createApp(supervisor, undefined, { verify: async (p) => p === "fixture", needsLogin: () => true });
     await listenLocal(server, 0);
     const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
     try {
       expect((await fetch(`${base}/api/sessions/codex/thread`)).status).toBe(401);
-      const login = await fetch(`${base}/api/login`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "test", password: "fixture" }) });
+      const login = await fetch(`${base}/api/login`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password: "fixture" }) });
       const cookie = login.headers.get("set-cookie")!.split(";")[0];
       const pages = [];
       for (const query of ["", "?before=80&limit=60", "?before=20&limit=60"]) {

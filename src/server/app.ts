@@ -5,7 +5,6 @@ import os from "node:os";
 import path from "node:path";
 import { WebSocketServer, type WebSocket } from "ws";
 import { ApiError, type SessionView, type Supervisor } from "../process/supervisor";
-import { AccountLocked } from "./windowsLogin";
 import { ACTIVE_WINDOW_MS, createLoginSessions, LOGIN_LIFETIME_MS } from "./loginSessions";
 import { RemoteError, type RemoteUpdate, type Tunnel } from "../remote/tunnel";
 import type { SettingsStore } from "../settings/toolSettings";
@@ -65,13 +64,29 @@ export function listenLocal(server: http.Server, port: number): Promise<void> {
 }
 
 export interface LoginGate {
-  /** True when Windows accepts this account. The password must not be stored or logged. */
-  verify(username: string, password: string): Promise<boolean>;
+  /** True for the access password set under 外网访问. The password must not be stored or logged. */
+  verify(password: string): Promise<boolean>;
+  /** Whether an access password is set; without one nobody can sign in from outside. */
+  ready?(): boolean;
+  /**
+   * Whether a request has to sign in. Defaults to everything not made on this PC itself: the tunnel's requests
+   * arrive at the loopback too, but under the public host name.
+   */
+  needsLogin?(request: http.IncomingMessage): boolean;
   /** Where sign-ins are kept so a server restart does not sign everyone out. Memory only when absent. */
   sessionFile?: string;
 }
 
 const SESSION_COOKIE = "mirrormix";
+
+/** Made in a browser on this PC: addressed to the loopback, with no proxy in between. */
+export function fromThisPc(request: http.IncomingMessage): boolean {
+  if (request.headers["x-forwarded-host"] || request.headers["x-forwarded-for"] || request.headers.forwarded) return false;
+  const host = String(request.headers.host ?? "").toLowerCase().replace(/:\d+$/, "");
+  const address = request.socket.remoteAddress ?? "";
+  const loopback = address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1";
+  return loopback && (host === "127.0.0.1" || host === "localhost" || host === "[::1]");
+}
 
 /**
  * Page origins allowed besides the one the request was addressed to, comma separated.
@@ -210,7 +225,9 @@ export function createApp(
     if (!folder || !existsSync(folder) || !statSync(folder).isDirectory()) throw new ApiError(409, "missing_workspace");
     return folder;
   };
+  const needsLogin = (request: http.IncomingMessage) => Boolean(gate) && (gate?.needsLogin ? gate.needsLogin(request) : !fromThisPc(request));
   const signedIn = (request: http.IncomingMessage) => {
+    if (!needsLogin(request)) return true;
     const token = readCookie(request.headers.cookie, SESSION_COOKIE);
     return Boolean(token && sessions.has(token));
   };
@@ -239,25 +256,17 @@ export function createApp(
         const now = Date.now();
         while (failures.length && now - failures[0] > LOGIN_WINDOW_MS) failures.shift();
         if (failures.length >= LOGIN_LIMIT) return sendJson(response, 429, { error: "rate_limited" });
-        const body = await readJson<{ username?: unknown; password?: unknown }>(request, MAX_LOGIN_BODY);
-        const username = typeof body.username === "string" ? body.username : "";
+        const body = await readJson<{ password?: unknown }>(request, MAX_LOGIN_BODY);
         const password = typeof body.password === "string" ? body.password : "";
-        if (!username.trim() || !password || username.length > 256 || password.length > 256) {
-          return sendJson(response, 401, { error: "bad_credentials" });
-        }
-        let ok = false;
-        try {
-          ok = await gate.verify(username.trim(), password);
-        } catch (error) {
-          if (error instanceof AccountLocked) return sendJson(response, 423, { error: "locked" });
-          throw error;
-        }
+        if (gate.ready && !gate.ready()) return sendJson(response, 409, { error: "no_access_password" });
+        if (!password || password.length > 256) return sendJson(response, 401, { error: "bad_credentials" });
+        const ok = await gate.verify(password);
         if (!ok) {
           failures.push(Date.now());
           return sendJson(response, 401, { error: "bad_credentials" });
         }
         const token = randomBytes(32).toString("base64url");
-        sessions.add(token, username);
+        sessions.add(token, "access");
         response.writeHead(200, {
           "content-type": "application/json; charset=utf-8",
           "set-cookie": `${SESSION_COOKIE}=${token}; ${cookieFlags(request)}; Max-Age=${Math.floor(LOGIN_LIFETIME_MS / 1000)}`,
@@ -278,7 +287,13 @@ export function createApp(
       if (request.method === "GET" && url.pathname === "/api/session") {
         response.setHeader("Cache-Control", "no-store");
         const authenticated = !gate || signedIn(request);
-        return sendJson(response, 200, { ok: true, authenticated, ...(!authenticated ? { username: os.userInfo().username } : {}) });
+        // Signing out only means something for a sign-in; on this PC there is none.
+        return sendJson(response, 200, {
+          ok: true,
+          authenticated,
+          ...(gate && needsLogin(request) ? { signedIn: authenticated } : {}),
+          ...(!authenticated && gate?.ready ? { passwordSet: gate.ready() } : {}),
+        });
       }
       if (gate && url.pathname.startsWith("/api/") && url.pathname !== "/api/health" && !signedIn(request)) {
         return sendJson(response, 401, { error: "unauthenticated" });

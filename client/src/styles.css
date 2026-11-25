@@ -5244,3 +5244,6 @@ button.pref-row:active { background: var(--rail); }
 .is-mobile .prompt-actions .quiet-button { width: 100%; min-height: 42px; justify-content: center; }
 .is-mobile .prompt-choice { padding: 11px 12px; }
 .is-mobile .prompt-detail pre { max-height: 200px; }
+
+/* Under the access password while none is set: nobody can sign in from outside yet. */
+.remote-fields .remote-warning { display: block; margin-top: 6px; color: var(--warn, #b45309); font-size: 12px; font-weight: 400; }

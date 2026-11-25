@@ -62,12 +62,12 @@ describe("authenticated Codex connection", () => {
         return { pid: 100, write: (text) => { writes.push(text); }, resize() {}, kill() {}, onData() {}, onExit() {} };
       },
     });
-    const server = createApp(supervisor, undefined, { verify: async (u, p) => u === "fixture" && p === "test" });
+    const server = createApp(supervisor, undefined, { verify: async (p) => p === "test", needsLogin: () => true });
     await listenLocal(server, 0);
     const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
     let socket: WebSocket | undefined;
     try {
-      const login = await fetch(`${base}/api/login`, { method: "POST", headers: { "content-type": "application/json", origin: base }, body: JSON.stringify({ username: "fixture", password: "test" }) });
+      const login = await fetch(`${base}/api/login`, { method: "POST", headers: { "content-type": "application/json", origin: base }, body: JSON.stringify({ password: "test" }) });
       const cookie = login.headers.get("set-cookie")!.split(";")[0];
       const headers = { "content-type": "application/json", cookie, origin: base };
       const opened = await fetch(`${base}/api/sessions/open`, { method: "POST", headers, body: JSON.stringify({ tool: "codex", id: "thread" }) });

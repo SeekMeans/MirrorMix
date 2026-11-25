@@ -16,13 +16,16 @@ const REMOTE_DOMAIN = "mm.seekmeans.cn";
 function errorText(code: string | undefined): string {
   if (code === "bad_subdomain") return tr("子域名只能用小写字母、数字和中间的短横线，最长 63 个字符。", "A subdomain can use lowercase letters, digits and inner hyphens, up to 63 characters.");
   if (code === "bad_token") return tr("连接口令太长了。", "The connection token is too long.");
+  if (code === "bad_access_password") return tr(`访问密码至少 ${ACCESS_MIN} 位。`, `The access password needs at least ${ACCESS_MIN} characters.`);
   return tr("没有保存。确认 MirrorMix 还在运行，再试一次。", "Not saved. Check that MirrorMix is still running and try again.");
 }
 
-type Draft = Pick<RemoteConfig, "subdomain"> & { token: string };
+const ACCESS_MIN = 6;
+
+type Draft = Pick<RemoteConfig, "subdomain"> & { token: string; access: string };
 
 function draftOf(view: RemoteView): Draft {
-  return { subdomain: view.subdomain, token: "" };
+  return { subdomain: view.subdomain, token: "", access: "" };
 }
 
 /**
@@ -37,6 +40,7 @@ export function RemotePanel() {
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showToken, setShowToken] = useState(false);
+  const [showAccess, setShowAccess] = useState(false);
   const [revealing, setRevealing] = useState(false);
   /** The saved token as fetched for the eye button. Sending it back unchanged is not a change. */
   const [revealed, setRevealed] = useState<string | null>(null);
@@ -120,10 +124,16 @@ export function RemotePanel() {
     setSaving(true);
     setError("");
     const newToken = draft.token.trim() && draft.token !== revealed ? draft.token : "";
+    if (draft.access && draft.access.length < ACCESS_MIN) {
+      setSaving(false);
+      setError(errorText("bad_access_password"));
+      return;
+    }
     try {
       const next = await api.saveRemote({
         subdomain: draft.subdomain,
         ...(newToken ? { token: newToken } : {}),
+        ...(draft.access ? { accessPassword: draft.access } : {}),
         ...(enabled === undefined ? {} : { enabled }),
       });
       edited.current = false;
@@ -131,6 +141,7 @@ export function RemotePanel() {
       setDraft(draftOf(next));
       setRevealed(null);
       setShowToken(false);
+      setShowAccess(false);
       setSaved(enabled === undefined);
     } catch (failure) {
       setError(errorText((failure as { code?: string }).code));
@@ -227,6 +238,33 @@ export function RemotePanel() {
       {view.enabled && (
         <>
           <div className="remote-fields">
+            <label className="wide">
+              <span>{tr("访问密码", "Access password")}</span>
+              <div className="remote-secret">
+                <input
+                  type={showAccess ? "text" : "password"}
+                  value={draft.access}
+                  placeholder={view.hasAccessPassword ? tr("已设置。要更换时才填", "Set. Fill in only to change it") : tr(`从外网打开时要输入它，至少 ${ACCESS_MIN} 位`, `Asked for when opened from outside; at least ${ACCESS_MIN} characters`)}
+                  autoComplete="new-password"
+                  spellCheck={false}
+                  onChange={(event) => change("access", event.target.value)}
+                />
+                <button
+                  type="button"
+                  className="remote-eye"
+                  aria-label={showAccess ? tr("隐藏密码", "Hide password") : tr("显示密码", "Show password")}
+                  aria-pressed={showAccess}
+                  title={showAccess ? tr("隐藏密码", "Hide password") : tr("显示密码", "Show password")}
+                  disabled={!draft.access}
+                  onClick={() => setShowAccess((shown) => !shown)}
+                >
+                  {showAccess ? <EyeOffIcon /> : <EyeIcon />}
+                </button>
+              </div>
+              {!view.hasAccessPassword && !draft.access && (
+                <small className="remote-warning">{tr("还没设置访问密码，从外网打开时无法登录。", "No access password yet: nobody can sign in from outside.")}</small>
+              )}
+            </label>
             <label className="wide">
               <span>{tr("连接口令", "Connection token")}</span>
               <div className="remote-secret">

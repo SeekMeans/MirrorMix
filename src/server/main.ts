@@ -35,7 +35,6 @@ import { createCommandTasks } from "../tasks/commandTasks";
 import { createWorkflowEngine } from "../workflow/engine";
 import { supervisorAi } from "../workflow/aiBridge";
 import { createModelStore } from "../models/modelStore";
-import { verifyWindowsLogin } from "./windowsLogin";
 import { createPreview, htmlFileAt, htmlFilesIn, listeningPorts, localPreviewOrigin } from "./preview";
 
 const PROCESS_QUERY = [
@@ -288,7 +287,9 @@ const modelStore = createModelStore(path.join(home, ".mirrormix", "models.json")
 const sshStore = createSshStore(path.join(home, ".mirrormix", "ssh.json"), dpapiBox(), sshKeyTools);
 const sshPlugin = { store: sshStore, manager: createSshManager(sshStore, (target) => connectTarget(target, sshStore)) };
 const server = createApp(supervisor, settings, {
-  verify: verifyWindowsLogin,
+  // From outside, the access password set under 外网访问; on this PC itself nothing is asked.
+  verify: async (password) => remote.checkAccess(password),
+  ready: () => remote.hasAccessPassword(),
   sessionFile: process.env.AIMISS_LOGIN_SESSIONS || path.join(home, ".mirrormix", "login-sessions.json"),
 }, {
   elevated: terminalElevation(),

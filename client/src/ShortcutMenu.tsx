@@ -1,6 +1,5 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { api, type Shortcut, type ShortcutLibrary } from "./api";
-import { COMMIT_MESSAGE_TOKEN } from "../../src/shared/shortcuts";
 import { EditIcon, PlusIcon, TrashIcon } from "./icons";
 
 import { tr } from "./i18n";
@@ -38,8 +37,6 @@ export function ShortcutMenu({ cwd, ready, onRun, onChoose, initial }: {
   const [busy, setBusy] = useState(false);
   const [editor, setEditor] = useState<Shortcut | null>(null);
   const [original, setOriginal] = useState<string | null>(null);
-  const [selected, setSelected] = useState<Shortcut | null>(null);
-  const [message, setMessage] = useState("");
   const [removing, setRemoving] = useState<string | null>(null);
   const groupList = useId();
   const mounted = useRef(true);
@@ -83,7 +80,7 @@ export function ShortcutMenu({ cwd, ready, onRun, onChoose, initial }: {
     if (!library || busy) return;
     setBusy(true); setProblem("");
     try {
-      const result = await api.prepareCommand(entry, library.revision, message);
+      const result = await api.prepareCommand(entry, library.revision, "");
       if (!mounted.current) return;
       if (onRun(result.command)) onChoose(entry.name);
       else setProblem(tr("终端尚未连接，请连接后重试。", "The terminal is not connected yet. Connect it and try again."));
@@ -94,18 +91,18 @@ export function ShortcutMenu({ cwd, ready, onRun, onChoose, initial }: {
   function edit(entry?: Shortcut) {
     setOriginal(entry ? keyOf(entry) : null);
     setEditor(entry ? { ...entry } : { group: groups.keys().next().value ?? tr("通用命令", "General"), name: "", command: "" });
-    setSelected(null); setRemoving(null); setProblem("");
+    setRemoving(null); setProblem("");
   }
 
   return (
     <section id="global-shortcut-menu" className="cmd-menu shortcut-menu" aria-label={tr("全局快捷命令", "Global shortcuts")} onKeyDown={event => {
-      if (event.key === "Escape" && (editor || selected || removing)) {
-        event.stopPropagation(); setEditor(null); setSelected(null); setRemoving(null);
+      if (event.key === "Escape" && (editor || removing)) {
+        event.stopPropagation(); setEditor(null); setRemoving(null);
       }
     }}>
       {problem && <p className="shortcut-error" role="alert">{problem}</p>}
       {!library && !problem && <p className="cmd-menu-empty">{tr("正在读取命令库…", "Loading commands…")}</p>}
-      {!editor && !selected && (
+      {!editor && (
         <div className="cmd-menu-list">
           {[...groups].map(([group, entries]) => (
             <details className="shortcut-group" key={group}>
@@ -114,11 +111,7 @@ export function ShortcutMenu({ cwd, ready, onRun, onChoose, initial }: {
                 const key = keyOf(entry);
                 return <div className="shortcut-entry" key={key}>
                   <div className="shortcut-row">
-                    <button type="button" className="shortcut-run" title={entry.command} disabled={!ready || busy} onClick={() => {
-                      setProblem("");
-                      if (entry.command.includes(COMMIT_MESSAGE_TOKEN)) { setSelected(entry); setMessage(""); }
-                      else void execute(entry);
-                    }}>{entry.name}</button>
+                    <button type="button" className="shortcut-run" title={entry.command} disabled={!ready || busy} onClick={() => void execute(entry)}>{entry.name}</button>
                     <button type="button" className="shortcut-action is-icon" disabled={busy} aria-label={tr(`编辑 ${entry.name}`, `Edit ${entry.name}`)} title={tr("编辑", "Edit")} onClick={() => edit(entry)}><EditIcon /></button>
                     <button type="button" className="shortcut-action is-icon is-danger" disabled={busy} aria-label={tr(`删除 ${entry.name}`, `Delete ${entry.name}`)} title={tr("删除", "Delete")} onClick={() => setRemoving(removing === key ? null : key)}><TrashIcon /></button>
                   </div>
@@ -133,23 +126,16 @@ export function ShortcutMenu({ cwd, ready, onRun, onChoose, initial }: {
           </details>}
         </div>
       )}
-      {selected && <form className="shortcut-form" onSubmit={event => { event.preventDefault(); void execute(selected); }}>
-        <strong>{selected.name}</strong>
-        <label>{tr("提交说明", "Commit message")}<input autoFocus maxLength={1000} value={message} placeholder={tr("留空使用 new", "Empty uses new")} onChange={event => setMessage(event.target.value)} /></label>
-        <p>{tr("留空会使用 new。执行时会暂存当前目录的改动，并依次提交、拉取、推送；任一步失败即停止。", "Empty uses new. Running it stages this folder's changes, then commits, pulls and pushes; it stops at the first failure.")}</p>
-        <details><summary>{tr("查看命令", "Show the command")}</summary><pre>{selected.command.replaceAll(COMMIT_MESSAGE_TOKEN, (message.trim() || "new"))}</pre></details>
-        <div className="shortcut-buttons"><button type="button" disabled={busy} onClick={() => setSelected(null)}>{tr("返回", "Back")}</button><button type="submit" disabled={!ready || busy}>{busy ? tr("正在准备…", "Preparing…") : tr("执行", "Run")}</button></div>
-      </form>}
       {editor && <form className="shortcut-form" onSubmit={event => void submitEditor(event)}>
         <strong>{original ? tr("编辑全局命令", "Edit global command") : tr("添加全局命令", "Add global command")}</strong>
         <label>{tr("分组", "Group")}<input required maxLength={80} list={groupList} value={editor.group} onChange={event => setEditor({ ...editor, group: event.target.value })} /></label>
         <datalist id={groupList}>{[...groups.keys()].map(group => <option key={group} value={group} />)}</datalist>
         <label>{tr("名称", "Name")}<input required autoFocus maxLength={80} value={editor.name} onChange={event => setEditor({ ...editor, name: event.target.value })} /></label>
         <label>{tr("命令", "Command")}<textarea required rows={3} maxLength={10_000} value={editor.command} onChange={event => setEditor({ ...editor, command: event.target.value })} /></label>
-        <p>{tr('多条命令用 && 连接。可用 git commit -m "{{message}}" 在执行时填写提交说明。', 'Join several commands with &&. Use git commit -m "{{message}}" to fill in a commit message when it runs.')}</p>
+        <p>{tr('多条命令用 && 连接。写 git commit -m "{{message}}" 时，提交说明自动填为当前时间和电脑名。', 'Join several commands with &&. In git commit -m "{{message}}", the message is filled in with the current time and computer name.')}</p>
         <div className="shortcut-buttons"><button type="button" disabled={busy} onClick={() => setEditor(null)}>{tr("取消", "Cancel")}</button><button type="submit" disabled={busy}>{busy ? tr("正在保存…", "Saving…") : tr("保存到全局", "Save as global")}</button></div>
       </form>}
-      {!editor && !selected && <button type="button" className="cmd-add-open" disabled={!library || busy} onClick={() => edit()}><PlusIcon /><span>{tr("添加全局命令", "Add global command")}</span></button>}
+      {!editor && <button type="button" className="cmd-add-open" disabled={!library || busy} onClick={() => edit()}><PlusIcon /><span>{tr("添加全局命令", "Add global command")}</span></button>}
     </section>
   );
 }
