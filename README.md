@@ -31,7 +31,7 @@ Open a conversation already on your PC and send your next message without starti
 On Windows with **Node.js 22+**, run in PowerShell:
 
 ```powershell
-git clone https://github.com/tnndworlds/MirrorMix.git
+git clone https://github.com/SeekMeans/MirrorMix.git
 cd MirrorMix
 npm install
 npm start

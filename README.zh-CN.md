@@ -31,7 +31,7 @@
 在装有 **Node.js 22+** 的 Windows 上，打开 PowerShell：
 
 ```powershell
-git clone https://github.com/tnndworlds/MirrorMix.git
+git clone https://github.com/SeekMeans/MirrorMix.git
 cd MirrorMix
 npm install
 npm start
