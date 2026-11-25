@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="320" viewBox="0 0 1120 320" role="img" aria-labelledby="title description">
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="240" viewBox="0 0 1120 240" role="img" aria-labelledby="title description">
   <title id="title">MirrorMix</title>
-  <desc id="description">Claude Code, Codex, and Cursor sessions come together in a local browser workspace.</desc>
+  <desc id="description">A laptop and a phone show the same conversation.</desc>
   <defs>
     <linearGradient id="background" x2="100%" y2="100%">
       <stop stop-color="#102029"/>
@@ -10,35 +10,31 @@
       <path d="M28 0H0V28" fill="none" stroke="#d3f5eb" stroke-opacity=".06"/>
     </pattern>
   </defs>
-  <rect width="1120" height="320" rx="22" fill="url(#background)"/>
-  <rect width="1120" height="320" rx="22" fill="url(#grid)"/>
-  <g font-family="Segoe UI, Arial, sans-serif">
-    <g transform="translate(58 57)">
-      <rect width="44" height="44" rx="11" fill="#0b6e6a"/>
-      <g transform="translate(5.5 5.5) scale(1.375)" fill="none" stroke-linecap="round" stroke-width="2.4">
-        <path d="M3 6h5.5c3 0 4 2 5 6s2 6 5 6H21" stroke="#f4fbfa"/>
-        <path d="M3 18h5.5c1.6 0 2.6-.6 3.4-1.8M15.1 7.8C15.9 6.6 16.9 6 18.5 6H21" stroke="#b7e4df"/>
-      </g>
+  <rect width="1120" height="240" rx="22" fill="url(#background)"/>
+  <rect width="1120" height="240" rx="22" fill="url(#grid)"/>
+  <g transform="translate(65 84)">
+    <rect width="72" height="72" rx="17" fill="#0b6e6a"/>
+    <g transform="scale(2.25) translate(4 4)" fill="none" stroke-linecap="round" stroke-width="2.4">
+      <path d="M3 6h5.5c3 0 4 2 5 6s2 6 5 6H21" stroke="#f4fbfa"/>
+      <path d="M3 18h5.5c1.6 0 2.6-.6 3.4-1.8M15.1 7.8C15.9 6.6 16.9 6 18.5 6H21" stroke="#b7e4df"/>
     </g>
-    <text x="117" y="85" fill="#a9dcd3" font-size="14" font-weight="600" letter-spacing="2">LOCAL SESSION WORKSPACE</text>
-    <text x="56" y="178" fill="#f4fbfa" font-size="72" font-weight="700">MirrorMix</text>
-    <text x="60" y="226" fill="#bad8d6" font-size="23">Your existing AI chats, in one browser.</text>
-    <path d="M765 102h27q26 0 26 26v7q0 25 25 25h19M765 160h97M765 218h27q26 0 26-26v-7q0-25 25-25h19" fill="none" stroke="#6bb9ad" stroke-width="2"/>
-    <g fill="#172d38" stroke="#437875">
-      <rect x="610" y="81" width="155" height="42" rx="9"/>
-      <rect x="610" y="139" width="155" height="42" rx="9"/>
-      <rect x="610" y="197" width="155" height="42" rx="9"/>
-    </g>
-    <g fill="#e2f4f1" font-size="17" font-weight="600">
-      <text x="631" y="108">Claude Code</text>
-      <text x="631" y="166">Codex</text>
-      <text x="631" y="224">Cursor</text>
-    </g>
-    <rect x="862" y="112" width="199" height="96" rx="13" fill="#174640" stroke="#77cfbc"/>
-    <path d="M862 139h199" stroke="#77cfbc" stroke-opacity=".55"/>
-    <circle cx="878" cy="126" r="3" fill="#9ee8d6"/>
-    <circle cx="889" cy="126" r="3" fill="#9ee8d6" opacity=".65"/>
-    <text x="880" y="170" fill="#f0fcf9" font-size="18" font-weight="700">Browser workspace</text>
-    <text x="880" y="191" fill="#b1ded4" font-size="14">127.0.0.1:4789</text>
+  </g>
+  <text x="165" y="149" fill="#f4fbfa" font-family="Segoe UI, Arial, sans-serif" font-size="88" font-weight="700">MirrorMix</text>
+  <g fill="none" stroke="#a3e5d7" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="658" y="56" width="176" height="113" rx="11" fill="#172d38"/>
+    <path d="M646 169h200l-9 12H655Z" fill="#172d38"/>
+    <path d="M858 120h54m-12-12 12 12-12 12"/>
+    <rect x="938" y="38" width="93" height="164" rx="16" fill="#172d38"/>
+    <path d="M976 51h17m-20 136h23"/>
+  </g>
+  <g fill="#95dfcf">
+    <rect x="727" y="77" width="87" height="17" rx="8"/>
+    <rect x="970" y="79" width="45" height="15" rx="7"/>
+    <rect x="737" y="131" width="77" height="17" rx="8"/>
+    <rect x="974" y="138" width="41" height="15" rx="7"/>
+  </g>
+  <g fill="#476e78">
+    <rect x="679" y="103" width="104" height="18" rx="8"/>
+    <rect x="953" y="106" width="51" height="18" rx="7"/>
   </g>
 </svg>

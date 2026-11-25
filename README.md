@@ -1,14 +1,12 @@
-![MirrorMix — local workspace for Claude Code, Codex, and Cursor sessions](docs/readme-banner.svg)
+![MirrorMix: from PC to phone](docs/readme-banner.svg)
 
-<p align="center">
-  <strong>Pick up your existing AI chats in the browser.</strong><br />
-  One local workspace for Claude Code, Codex, and Cursor.
-</p>
+# Keep coding and deploying away from your desk
+
+MirrorMix gives you access to your PC's development workspace from your phone. Start a task in Codex before you leave, check its progress and send a follow-up on the go, or run a deployment task you've already set up.
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue" alt="MIT license" /></a>
   <img src="https://img.shields.io/badge/Platform-Windows-2563eb" alt="Windows" />
-  <img src="https://img.shields.io/badge/Node.js-22%2B-287a4b" alt="Node.js 22 or later" />
 </p>
 
 <p align="center">
@@ -16,19 +14,42 @@
 </p>
 
 <p align="center">
-  <a href="#quick-start">Quick start</a> ·
-  <a href="#features">Features</a> ·
-  <a href="#connection-mode">Connection mode</a> ·
-  <a href="#security">Security</a>
+  <a href="#what-you-can-do-from-your-phone">What you can do</a> ·
+  <a href="#connect-your-phone">Connect your phone</a> ·
+  <a href="#download">Download</a> ·
+  <a href="#run-from-source">Run from source</a>
 </p>
 
-## Overview
+## What you can do from your phone
 
-Open a conversation already on your PC and send your next message without starting a new chat. MirrorMix works with the tools and session records already on your machine. **It does not call model APIs directly.**
+- **Pick up an existing chat.** Read replies and send your next message in a Claude Code, Codex, or Cursor session that's already on your PC.
+- **Manage your servers.** Use the built-in SSH terminal to check logs and run commands on a configured server. Upload or download files with SFTP.
+- **Run repeatable maintenance and deployments.** Save a script and its target server as a task, such as updating a test environment or restarting a service. Tap **Run** on your phone and see the status and output without retyping commands.
 
-## Quick start
+<p align="center">
+  <img src="docs/mobile-session.png" width="280" alt="MirrorMix on a phone, continuing an existing Codex session from the PC" />
+</p>
 
-On Windows with **Node.js 22+**, run in PowerShell:
+## Connect your phone
+
+Once MirrorMix is running on your Windows PC, all you need on your phone is a browser:
+
+1. **Request an access address.** Apply in the MirrorMix mini program. Once approved, it shows a subdomain and a connection token.
+2. **Enable access on your PC.** In MirrorMix, go to **Settings → General → Remote access**. Enter the subdomain and token, save, and wait for **Connected**.
+3. **Pick up on your phone.** Open your HTTPS access address and sign in with the PC's Windows account. Open an existing chat, or go to **Plugins → SSH** to work on a server.
+
+**Before you leave:** Keep the PC on, online, and running MirrorMix. Keep sign-in enabled for remote access, and don't expose the local service directly to the internet.
+
+## Download
+
+**The one-click Windows build is not available yet.** The goal is simple: download, double-click to launch, and open MirrorMix in your browser. No separate Node.js install or terminal commands. Phone access still needs the setup above.
+
+## Run from source
+
+<details>
+<summary>Expand: for developers and early testers</summary>
+
+On Windows with **Git and Node.js 22+**, open PowerShell and run:
 
 ```powershell
 git clone https://github.com/SeekMeans/MirrorMix.git
@@ -39,16 +60,15 @@ npm start
 
 `npm start` builds the client and starts the server. Open <http://127.0.0.1:4789> in your browser, then select an existing session.
 
-## Features
+### Advanced features
 
-- Browse and continue Claude Code, Codex, and Cursor sessions on this PC.
 - Read Codex JSONL transcripts and paginated SQLite history, and display project names from the Codex desktop sidebar.
 - Send through the desktop window when available, with CLI or queue fallback paths depending on the tool and connection mode.
-- Open shared project terminals, run shortcuts, and use plugins for commands, schedules, and SSH.
+- Open shared project terminals, run shortcuts and local command tasks, and view schedules created in Claude and Codex.
 - Start, stop, or restart named services from the project terminal.
 - Optionally reach MirrorMix through your own tunnel or reverse proxy while keeping the app bound to localhost.
 
-## Development
+### Development
 
 Development (server hot-reload):
 
@@ -72,7 +92,7 @@ $conn = Get-NetTCPConnection -LocalPort 4789 -State Listen -ErrorAction Silently
 if ($conn) { Stop-Process -Id $conn.OwningProcess }
 ```
 
-## Connection mode
+### Connection mode
 
 Unset defaults to `legacy` (original Codex CLI resume/create and Claude inbox / desktop follow / CLI takeover paths). Cursor behavior is unchanged either way.
 
@@ -92,7 +112,7 @@ Environment variables win over the file. That file lives outside the repo.
 
 In `desktop` mode the web UI drives the desktop session input via Windows UI Automation and syncs replies from local history. The matching desktop app must be open and signed in. Sessions are matched by full title; open the chat in the desktop app first if it is missing from the sidebar.
 
-## Security
+### Security
 
 MirrorMix listens on **`127.0.0.1` only**. Do not bind it to `0.0.0.0`. It can send into Claude/Codex/Cursor and open shells in your project folders—exposing it on the public internet is equivalent to handing over the machine.
 
@@ -102,7 +122,7 @@ To use it from a phone or another PC, put a reverse proxy or tunnel in front of 
 - Prefer an extra gate (Tailscale, proxy auth, Cloudflare Access, etc.)
 - Keep MirrorMix login enabled; use a strong Windows password
 
-### Tailscale (simple)
+#### Tailscale (simple)
 
 ```powershell
 tailscale serve --bg 4789
@@ -110,7 +130,7 @@ tailscale serve --bg 4789
 
 Open `https://<machine>.<tailnet>.ts.net` from your phone on the same Tailscale account.
 
-### Self-hosted tunnel
+#### Self-hosted tunnel
 
 Point frp/Caddy/nginx (or similar) at `127.0.0.1:4789`, terminate TLS on the server, and do not expose the raw tunnel port to the internet. If your public origin differs from what the browser uses, set:
 
@@ -119,7 +139,7 @@ $env:MIRRORMIX_ALLOWED_ORIGINS = "https://mm.example.com"
 npm start
 ```
 
-## Config tips
+### Config tips
 
 | Item | Where |
 |---|---|
@@ -129,6 +149,8 @@ npm start
 | Remote / tunnel settings | `~\.mirrormix\` and optional `mirrormix.config.json` / `MIRRORMIX_CONFIG` |
 
 Pinned chats, quotas, and most “how do I …” details are in the in-app Help page.
+
+</details>
 
 ## License
 
