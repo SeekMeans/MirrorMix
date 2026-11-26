@@ -1,160 +1,88 @@
-![MirrorMix：从电脑切换到手机](docs/readme-banner.svg)
-
-# 不在电脑前，也能继续开发和部署
-
-MirrorMix 把你电脑上的开发工作台带到手机。出门前让 Codex 开始改代码，路上用手机看进度、接着发消息；需要发版时，也能从手机运行已经配置好的部署任务。
+![MirrorMix：在电脑和手机上使用同一个 AI 工作台](docs/readme-banner.svg)
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue" alt="MIT 许可证" /></a>
   <img src="https://img.shields.io/badge/Platform-Windows-2563eb" alt="Windows" />
-</p>
-
-<p align="center">
+  <br />
   <a href="README.md">English</a> · <strong>简体中文</strong>
 </p>
 
+[概览](#概览) · [核心功能](#核心功能) · [插件扩展](#插件扩展) · [安装与访问](#安装与访问)
+
+## 概览
+
+**MirrorMix 是一个可以从电脑用到手机的 AI 工作台。** 它运行在你的 Windows 电脑上：在电脑浏览器里统一看多个 AI 工具的进度，离开电脑后，用手机继续原来的工作。
+
+- **多个 AI 工具，一个状态看板。** 把 Claude Code、Codex 和 Cursor 的已有会话集中起来，一眼看清谁还在回复、哪条有新结果，点开就能接着聊，不用来回切换桌面应用。
+- **换设备，不换会话。** 在电脑上发起任务，在手机上看进度、补充要求、查看生成的文件或网页。实际工作仍由电脑上的工具完成，手机不用再安装一套 AI 工具。
+
+不写代码也能用：在电脑上让 AI 起草活动方案或周报，路上用手机看初稿、补一句修改意见，回到电脑继续整理。
+
+## 核心功能
+
+| 功能 | 电脑端 | 手机端 |
+| --- | --- | --- |
+| **状态看板** | 集中查看各工具正在回复、回复完还没看的会话。 | 随时看待处理的回复，工作台还会汇总当天的会话和消息。 |
+| **会话接续** | 按工具或项目找到已有会话，打开就能继续。 | 接着同一条会话读回复、补充要求，不用再解释一遍背景。 |
+| **查看创作内容** | 预览 AI 生成的草稿、图片、PDF 或网页。 | 在外面快速看方案或页面效果，直接回到原会话提修改意见。 |
+| **资源管理器** | 在会话内打开对应文件夹，浏览文件树、预览或下载文件。 | 进入同一个文件夹，点文件全屏预览，不用先把文件发到手机。 |
+
 <p align="center">
-  <a href="#手机上能做什么">手机上能做什么</a> ·
-  <a href="#怎么连上手机">怎么连上手机</a> ·
-  <a href="#下载">下载</a> ·
-  <a href="#从源码运行">从源码运行</a>
+  <a href="docs/mobile-dashboard.png"><img src="docs/mobile-dashboard.png" width="130" alt="手机工作台：按工具查看当日活动" /></a>
+  <a href="docs/mobile-session.png"><img src="docs/mobile-session.png" width="110" alt="手机端：继续已有 Codex 会话" /></a>
 </p>
+<p align="center"><sub>左：手机工作台 · 右：继续原会话（点击查看大图）</sub></p>
 
-## 手机上能做什么
+## 插件扩展
 
-- **接着聊，不用重开。** 打开电脑上已有的 Claude Code、Codex 或 Cursor 会话，读回复、发下一条消息。
-- **远程管理服务器。** 用内置的 SSH 终端连接已配置的服务器，查日志、执行命令，也能通过 SFTP 上传或下载文件。
-- **一键跑运维和部署任务。** 把常用脚本和目标服务器存成任务，例如更新测试环境或重启服务。之后在手机上点「执行」，就能看到状态和输出，不用再手敲一遍命令。
+在「插件」里按需添加功能。日常写作和查资料不需要开这些插件；需要运行命令、管理服务器时，再把它们加进工作台。
 
-<p align="center">
-  <a href="docs/mobile-dashboard.png"><img src="docs/mobile-dashboard.png" width="130" alt="手机工作台：查看今日活动" /></a>
-  <a href="docs/mobile-session.png"><img src="docs/mobile-session.png" width="110" alt="手机会话：继续电脑上已有的 Codex 对话" /></a>
-</p>
-<p align="center"><sub>左：手机工作台 · 右：继续 Codex 会话（点击查看大图）</sub></p>
+- **项目终端和快捷命令。** 可在会话旁打开项目终端。要复用常用操作，可以保存快捷命令，或使用「命令任务」插件。
+- **远程管理服务器。** 在「SSH 连接」插件里连接已配置的服务器，查日志、执行命令，或用 SFTP 上传和下载文件。
+- **一键运行运维和部署任务。** 在 SSH 插件里把脚本和目标服务器存成任务，例如更新测试环境或重启服务。之后在电脑或手机上点击「执行」，就能查看状态和输出。
 
-## 怎么连上手机
+**一起做插件：** 欢迎自行开发插件，通过 [Issues](https://github.com/SeekMeans/MirrorMix/issues) 提议功能，或提 PR 参与维护。当前插件随 MirrorMix 一起发布；第三方插件的独立安装暂未开放。
 
-先在 Windows 电脑上运行 MirrorMix，再选一种方式开通手机访问：
+## 安装与访问
 
-- **有云主机：自己搭内网穿透。** 用自己的云主机做中转，将 HTTPS 地址转发到 Windows 电脑上的 MirrorMix。无需向小程序申请。
-- **没有云主机：用小程序申请端口。** 审核通过后，小程序会显示子域名和连接口令。在电脑端 MirrorMix 打开「设置 → 通用设置 → 外网访问」，填入这两项并保存，等待显示「已连接」。
+### 1. Windows 安装
 
-开通后，用手机浏览器打开对应的 **HTTPS 地址**，用这台电脑的 Windows 账户登录。想继续聊，就点开已有会话；想操作服务器，就打开「插件 → SSH 连接」。
+1. 拿到 Windows 安装包后，双击打开 Setup 安装程序，按提示完成安装。
+2. 从开始菜单打开 MirrorMix，在托盘控制面板点「启动」。浏览器会打开工作台，默认地址是 <http://127.0.0.1:4789>。
+3. 在电脑上安装并登录你要使用的 AI 工具，再到 MirrorMix 打开已有会话。
+
+安装包不用克隆仓库或手敲构建命令，但当前需要电脑已安装 **Node.js 22 或以上版本**，安装包暂未内置。公开下载请留意 [GitHub Releases](https://github.com/SeekMeans/MirrorMix/releases)。
+
+### 2. 外网访问：让手机打开工作台
+
+- **没有云主机：** 在 MirrorMix 小程序申请访问地址，或在电脑端「设置 → 外网访问」里申请。审核通过并绑定电脑后，设置访问密码并开启外网访问。看到「已连接」后，复制 HTTPS 地址到手机浏览器，用刚设置的密码登录。
+- **有自己的云主机：** 可以自建内网穿透，不用申请。用 HTTPS 入口转发到运行 MirrorMix 的电脑，并配置访问控制；不要直接把本机端口暴露到公网。
+
+手机连的是同一台电脑。离开前请让电脑保持开机、联网，并让 MirrorMix 继续运行。
+
+### 3. 在浏览器里打开生成的网页
+
+如果 AI 生成了 HTML 页面，或项目已经在电脑上运行，点会话旁的**地球图标**，选择要预览的网页文件或本机服务，即可在新标签页打开。使用 MirrorMix 自带的外网访问时，也可以在手机上打开这个预览。预览链接是临时的，不是可以长期分享的公开网址。
+
+### 4. 全屏使用
+
+- **电脑：** 打开工作台或生成的网页，在支持的浏览器里按 `F11` 进入／退出全屏。
+- **手机：** 在资源管理器点文件即可全屏预览；想快速回到工作台，也可以用浏览器的「添加到主屏幕」（如支持）。
 
 <details>
-<summary>自建内网穿透的配置要点</summary>
+<summary>从源码运行（开发者）</summary>
 
-例如用 frp：在云主机上运行 frps，Windows 上的 frpc 转发到本机的 `127.0.0.1:4789`。在云主机上用 HTTPS 反向代理作为入口，支持 WebSocket，并保留原始 `Host`（或传递正确的 `X-Forwarded-Host`）。如果代理改写了主机名且未转发原始主机名，在启动 MirrorMix 前设置 `MIRRORMIX_ALLOWED_ORIGINS` 为实际访问的地址，例如 `https://mm.example.com`。
+在装有 Git 和 Node.js 22+ 的 Windows 上打开 PowerShell：
 
-不要对公网开放转发后的 MirrorMix 端口；通过 HTTPS 入口访问，并保留登录保护。
-
-</details>
-
-**出门前记得：** 让电脑保持开机、联网，并让 MirrorMix 继续运行。外网访问请保留登录保护，不要把本地服务直接暴露到公网。
-
-## 下载
-
-**Windows 一键运行版尚未发布。** 发布后的目标是：下载 → 双击启动 → 打开浏览器。不用单独安装 Node.js，也不用敲命令。手机访问仍需完成上面的开通步骤。
-
-## 从源码运行
-
-<details>
-<summary>展开：仅供开发者和想提前试用的用户</summary>
-
-在装有 **Git 和 Node.js 22+** 的 Windows 上打开 PowerShell：
-
-```powershell
+~~~powershell
 git clone https://github.com/SeekMeans/MirrorMix.git
 cd MirrorMix
 npm install
 npm start
-```
+~~~
 
-`npm start` 会先构建页面，再启动服务。用浏览器打开 <http://127.0.0.1:4789>，选一个已有会话就能接着聊。
-
-### 进阶功能
-
-- 读取 Codex JSONL 和分页 SQLite 历史，显示 Codex 桌面侧栏的项目名称；自定义分区里的项目也会平铺显示。
-- 可用时通过桌面窗口发送；根据工具和通信模式，也可走 CLI 或队列等后备路径。
-- 按工作区共享项目终端，支持全局快捷命令和本机命令任务。可查看在 Claude 和 Codex 里创建的定时任务。
-- 在项目终端识别或配置服务启动命令，单独或批量启动、停止、重启。
-- 可选：经你自己的隧道或反向代理远程访问，应用本身仍只监听本机。
-
-### 开发
-
-开发模式（服务端热更新）：
-
-```powershell
-npm run dev
-```
-
-改了前端后，请在项目根目录执行 `npm run build`（Vite 输出到根目录 `dist/`，由服务端提供），或再跑一次 `npm start`。
-
-换端口：
-
-```powershell
-$env:AIMISS_PORT = "4790"
-npm run dev
-```
-
-在启动它的终端里按 Ctrl+C 停止。终端已经不在时：
-
-```powershell
-$conn = Get-NetTCPConnection -LocalPort 4789 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
-if ($conn) { Stop-Process -Id $conn.OwningProcess }
-```
-
-### 通信模式
-
-未配置时默认 `legacy`：保留原有 Codex CLI 恢复/新建，以及 Claude 输入通道、桌面跟随和 CLI 接管。Cursor 的通信方式两种模式都不变。
-
-需要 Codex、Claude 都经桌面端收发时，启动前设置：
-
-```powershell
-$env:AIMISS_CONNECTION_MODE = "desktop"
-```
-
-或在本机写入 `%USERPROFILE%\.mirrormix\connection-mode.json`：
-
-```json
-{ "mode": "desktop" }
-```
-
-环境变量优先于文件。配置文件在仓库外，不会随 Git 提交。
-
-`desktop` 模式下，网页通过 Windows UI Automation 操作桌面端输入框并同步本地历史。对应桌面应用需已打开并登录；按完整会话标题匹配，侧栏没有时请先在桌面端点开。
-
-### 安全
-
-MirrorMix **只监听 `127.0.0.1`**，不要改成 `0.0.0.0`。它能往 Claude / Codex / Cursor 发指令，也能在工作目录打开命令行——直接挂到公网等于交出这台电脑。
-
-从手机或其它电脑访问时，在本机前面放反向代理或隧道，转发到 `127.0.0.1:4789`，并做到：
-
-- 外面用 **HTTPS**（登录用的是 Windows 账号）
-- 最好再加一道门（Tailscale、代理密码、Cloudflare Access 等）
-- 不要关掉登录；Windows 账户用足够强的密码
-
-#### Tailscale（推荐自用）
-
-```powershell
-tailscale serve --bg 4789
-```
-
-同一 Tailscale 账号下，手机打开 `https://电脑名.你的tailnet名.ts.net`。
-
-### 配置一览
-
-| 项 | 位置 |
-|---|---|
-| 端口 | `AIMISS_PORT`（默认 `4789`） |
-| 通信模式 | `AIMISS_CONNECTION_MODE` 或 `~\.mirrormix\connection-mode.json` |
-| 全局快捷命令 | `~\.mirrormix\commands.json`（或 `AIMISS_COMMANDS`） |
-| 外网 / 隧道 | `~\.mirrormix\`，以及可选的 `mirrormix.config.json` / `MIRRORMIX_CONFIG` |
-
-置顶会话、额度、操作细节见应用内「帮助」。
+打开 <http://127.0.0.1:4789>。开发时可用 `npm run dev` 启动带热更新的服务。更多操作见应用内「帮助」。
 
 </details>
 
-## 许可证
-
-[MIT](LICENSE) © tnndworlds
+[MIT 许可证](LICENSE) © tnndworlds
