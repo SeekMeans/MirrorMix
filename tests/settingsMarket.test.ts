@@ -76,10 +76,11 @@ describe("settings", () => {
 
   it("shows AI tools and remote access as peer settings sections", () => {
     const page = settings("dialog");
-    expect(page).toContain("General</button>");
-    expect(page).toContain("AI tools</button>");
-    expect(page).toContain("Remote access</button>");
-    expect(page).not.toContain("Connection check");
+    expect(page).toContain("通用设置</button>");
+    expect(page).toContain("AI 工具</button>");
+    expect(page).toContain("外网访问</button>");
+    expect(page).toContain(">恢复默认<");
+    expect(page).not.toContain("连通性检测");
   });
 
   it("puts AI tools and remote access under the language row on a phone", async () => {
@@ -91,5 +92,7 @@ describe("settings", () => {
     expect(language).toBeGreaterThan(-1);
     expect(tools).toBeGreaterThan(language);
     expect(remote).toBeGreaterThan(tools);
+    expect(page.indexOf('<span class="pref-title">恢复默认</span>')).toBeGreaterThan(remote);
+    expect(settings("dialog")).toContain(">恢复默认<");
   });
 });

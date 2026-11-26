@@ -1,10 +1,11 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { ProcessInfo } from "../src/process/occupancy";
 import { createSupervisor } from "../src/process/supervisor";
+import { createTunnel } from "../src/remote/tunnel";
 import { createApp, listenLocal } from "../src/server/app";
 import { createSettingsStore, detectTools } from "../src/settings/toolSettings";
 
@@ -35,6 +36,9 @@ describe("tool settings", () => {
     expect(settings.read()).toMatchObject({ tools: ["codex"], pinned: [], language: undefined });
     expect(settings.write({ language: "en" })).toMatchObject({ tools: ["codex"], language: "en" });
     expect(() => settings.write({ language: "fr" })).toThrow("bad_request");
+    expect(settings.forgetLanguage()).toMatchObject({ tools: ["codex"], pinned: [] });
+    expect(settings.read().language).toBeUndefined();
+    expect(JSON.parse(readFileSync(file, "utf8"))).not.toHaveProperty("language");
   });
 
   it("counts a tool as open only when its desktop app is running", () => {
@@ -89,6 +93,44 @@ describe("tool settings", () => {
       processes = [];
       expect(await open("codex")).toEqual([409, "tool_offline"]);
     } finally {
+      supervisor.dispose();
+      await new Promise((resolve) => server.close(resolve));
+    }
+  });
+
+  it("restores the saved language and remote access together", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "aimiss-reset-"));
+    const settings = createSettingsStore(path.join(root, "settings.json"), () => []);
+    settings.write({ tools: ["codex"], language: "en" });
+    const tunnel = createTunnel({
+      dir: root,
+      localPort: 4789,
+      seal: (secret) => secret,
+      unseal: (sealed) => sealed,
+    });
+    tunnel.update({ enabled: true, subdomain: "office", token: "shared-secret", accessPassword: "secret1" });
+    const supervisor = createSupervisor({
+      bins: { claudeExe: "claude.exe", nodeExe: "node.exe", codexJs: "codex.js" },
+      roots: { claudeProjectsDir: path.join(root, "projects"), codexSessionsDir: path.join(root, "sessions"), claudeDataDir: "" },
+      listProcesses: () => [],
+      spawn: () => {
+        throw new Error("should not spawn");
+      },
+    });
+    const server = createApp(supervisor, settings, undefined, undefined, tunnel);
+    await listenLocal(server, 0);
+    const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    try {
+      const response = await fetch(`${base}/api/settings/reset`, { method: "POST" });
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as { language?: string; tools: string[] };
+      expect(body.language).toBeUndefined();
+      expect(body.tools).toEqual(["codex"]);
+      expect(settings.read().language).toBeUndefined();
+      expect(tunnel.view()).toMatchObject({ enabled: false, hasToken: false, hasAccessPassword: false, status: { state: "off" } });
+      expect(tunnel.token()).toBeNull();
+    } finally {
+      tunnel.dispose();
       supervisor.dispose();
       await new Promise((resolve) => server.close(resolve));
     }

@@ -71,6 +71,7 @@ function setup() {
 const filled = () => ({
   subdomain: "office",
   token: "shared-secret",
+  accessPassword: "secret1",
 });
 
 describe("frpc settings", () => {
@@ -83,6 +84,7 @@ describe("frpc settings", () => {
   it("logs in as this PC's own frp user and writes one http proxy under its subdomain", () => {
     const config: RemoteConfig & RemoteServer = {
       enabled: true,
+      api: "https://dns.seekmeans.cn",
       server: "1.2.3.4",
       serverPort: 7000,
       domain: "mm.seekmeans.cn",
@@ -104,24 +106,24 @@ describe("frpc settings", () => {
   it("takes the server from mirrormix.config.json and falls back to seekmeans.cn:5000", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "aimiss-config-"));
     expect(loadRemoteServer(path.join(dir, "none.json"))).toEqual({
-      server: { server: "seekmeans.cn", serverPort: 5000, domain: "mm.seekmeans.cn" },
+      server: { server: "seekmeans.cn", serverPort: 5000, domain: "mm.seekmeans.cn", api: "https://dns.seekmeans.cn" },
       problems: [],
     });
     const good = path.join(dir, "good.json");
-    writeFileSync(good, JSON.stringify({ remote: { server: "1.2.3.4", serverPort: 7000, domain: "mm.example.com" } }));
-    expect(loadRemoteServer(good).server).toEqual({ server: "1.2.3.4", serverPort: 7000, domain: "mm.example.com" });
+    writeFileSync(good, JSON.stringify({ remote: { server: "1.2.3.4", serverPort: 7000, domain: "mm.example.com", api: "https://dns.example.com/" } }));
+    expect(loadRemoteServer(good).server).toEqual({ server: "1.2.3.4", serverPort: 7000, domain: "mm.example.com", api: "https://dns.example.com" });
     const bad = path.join(dir, "bad.json");
-    writeFileSync(bad, JSON.stringify({ remote: { server: 'x"y', serverPort: 70000 } }));
+    writeFileSync(bad, JSON.stringify({ remote: { server: 'x"y', serverPort: 70000, api: "ftp://x/y" } }));
     const loaded = loadRemoteServer(bad);
-    expect(loaded.server).toEqual({ server: "seekmeans.cn", serverPort: 5000, domain: "mm.seekmeans.cn" });
-    expect(loaded.problems).toHaveLength(2);
+    expect(loaded.server).toEqual({ server: "seekmeans.cn", serverPort: 5000, domain: "mm.seekmeans.cn", api: "https://dns.seekmeans.cn" });
+    expect(loaded.problems).toHaveLength(3);
   });
 
   it("reads frpc's own words into a state", () => {
     expect(readFrpcLine("[I] [proxy_manager.go:144] [mirrormix-office] start proxy success")?.state).toBe("connected");
     expect(readFrpcLine("[E] login to the server failed: authorization failed. With loginFailExit enabled")?.message).toMatch(/口令/);
     expect(readFrpcLine("[W] [mirrormix-office] start error: subdomain [office] is already used")?.message).toMatch(/占用/);
-    expect(readFrpcLine("[E] login to the server failed: invalid user or token")?.message).toMatch(/小程序/);
+    expect(readFrpcLine("[E] login to the server failed: invalid user or token")?.message).toMatch(/重新取口令/);
     expect(readFrpcLine("[W] [office.mirrormix-home] start error: subdomain not granted to this user")?.message).toMatch(/没有分配/);
     expect(readFrpcLine("[W] connect to server error: dial tcp 1.2.3.4:7000: connectex: No connection could be made")?.message).toMatch(/连不上/);
     // Seen for real: login works, but frps still holds the proxy from another connection.
@@ -147,7 +149,7 @@ describe("tunnel", () => {
       unseal: (sealed) => sealed.replace(/^sealed:/, ""),
     });
 
-    tunnel.update({ enabled: true, subdomain: "office", token: "shared-secret" });
+    tunnel.update({ enabled: true, subdomain: "office", token: "shared-secret", accessPassword: "secret1" });
 
     expect(fake.runs).toHaveLength(1);
     expect(fake.runs[0].file).toBe(bundled);
@@ -169,7 +171,7 @@ describe("tunnel", () => {
     expect(JSON.stringify(tunnel.view())).not.toContain("shared-secret");
     expect(tunnel.token()).toBe("shared-secret");
 
-    tunnel.update({ enabled: true });
+    tunnel.update({ enabled: true, accessPassword: "secret1" });
     expect(runs).toHaveLength(1);
     expect(runs[0].file).toBe(frpc);
     expect(runs[0].env).toEqual({});
@@ -194,11 +196,71 @@ describe("tunnel", () => {
     tunnel.dispose();
   });
 
+  it("restores remote access to a fresh install and ignores a reply already on the way", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "aimiss-remote-reset-"));
+    const frpc = path.join(dir, "frpc.exe");
+    writeFileSync(frpc, "");
+    writeFileSync(
+      path.join(dir, "remote.json"),
+      JSON.stringify({
+        enabled: true,
+        subdomain: "office",
+        sealedToken: "sealed:shared-secret",
+        accessHash: "scrypt:salt:hash",
+        wechat: { bound: true, nickname: "me" },
+        applications: [{ slug: "office", status: "ready", message: "", submittedAt: 1 }],
+      }),
+    );
+    let release: (value: { status: number; body: Record<string, unknown> }) => void = () => undefined;
+    const pending = new Promise<{ status: number; body: Record<string, unknown> }>((resolve) => {
+      release = resolve;
+    });
+    const fake = fakeFrpc();
+    const tunnel = createTunnel({
+      dir,
+      localPort: 4789,
+      bundledFrpc: frpc,
+      spawn: fake.spawn,
+      seal: (secret) => `sealed:${secret}`,
+      unseal: (sealed) => sealed.replace(/^sealed:/, ""),
+      post: () => pending,
+    });
+    expect(tunnel.view()).toMatchObject({ enabled: true, hasToken: true, hasAccessPassword: true, subdomain: "office" });
+    const refresh = tunnel.refresh();
+    const restored = tunnel.reset();
+    release({
+      status: 200,
+      body: { status: "ready", slug: "office", tunnel: { user: "office", token: "shared-secret" } },
+    });
+    await refresh;
+
+    expect(restored).toMatchObject({
+      enabled: false,
+      subdomain: defaultSubdomain(),
+      hasToken: false,
+      hasAccessPassword: false,
+      status: { state: "off" },
+      binding: { bound: false, wechat: false },
+      applications: [],
+    });
+    expect(tunnel.token()).toBeNull();
+    expect(tunnel.checkAccess("secret1")).toBe(false);
+    expect(tunnel.origin()).toBeNull();
+    expect(fake.runs.map((run) => run.killed)).toEqual([true]);
+    expect(JSON.parse(readFileSync(path.join(dir, "remote.json"), "utf8"))).toEqual({
+      enabled: false,
+      subdomain: defaultSubdomain(),
+      sealedToken: "",
+    });
+    expect(tunnel.view().hasToken).toBe(false);
+    tunnel.dispose();
+  });
+
   it("says what is missing instead of starting, and starts again after frpc stops", async () => {
     const { tunnel, runs } = setup();
-    tunnel.update({ enabled: true });
+    tunnel.update({ enabled: true, accessPassword: "secret1" });
     expect(runs).toHaveLength(0);
-    expect(tunnel.view().status).toMatchObject({ state: "error", message: "还没有填连接口令。" });
+    expect(tunnel.view().status).toMatchObject({ state: "error", message: "还没有绑定地址。用域名标识和连接口令绑定。" });
 
     tunnel.update(filled());
     expect(runs).toHaveLength(1);

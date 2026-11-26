@@ -438,10 +438,31 @@ export function createApp(
       if (remote && request.method === "GET" && url.pathname === "/api/remote/token") {
         // Only for the eye button in Settings. Signed-in users can already run anything on this PC.
         response.setHeader("Cache-Control", "no-store");
-        return sendJson(response, 200, { token: remote.token() ?? "" });
+        // ?slug=: the token kept in that application record (申请记录).
+        return sendJson(response, 200, { token: remote.token(url.searchParams.get("slug") || undefined) ?? "" });
       }
       if (remote && request.method === "POST" && url.pathname === "/api/remote/retry") {
         return sendJson(response, 200, remote.retryNow());
+      }
+      // The address with DNSMgr: apply for a subdomain, bind this PC with it, check now, and the
+      // mini program code that binds a WeChat account. DNSMgr's own words come back as `message`.
+      if (remote && request.method === "POST" && ["/api/remote/apply", "/api/remote/bind", "/api/remote/refresh", "/api/remote/bind-code"].includes(url.pathname)) {
+        try {
+          if (url.pathname === "/api/remote/apply" || url.pathname === "/api/remote/bind") {
+            const body = await readJson<{ subdomain?: unknown; token?: unknown }>(request, 4_096);
+            const subdomain = String(body?.subdomain ?? "");
+            return sendJson(response, 200, await (url.pathname === "/api/remote/apply" ? remote.apply(subdomain) : remote.bind(subdomain, String(body?.token ?? ""))));
+          }
+          if (url.pathname === "/api/remote/refresh") return sendJson(response, 200, await remote.refresh());
+          response.setHeader("Cache-Control", "no-store");
+          return sendJson(response, 200, await remote.bindCode());
+        } catch (error) {
+          if (error instanceof RemoteError) {
+            const status = error.code === "api_unreachable" ? 502 : 400;
+            return sendJson(response, status, { error: error.code, message: error.message === error.code ? "" : error.message });
+          }
+          throw error;
+        }
       }
       if (remote && url.pathname === "/api/remote") {
         if (request.method === "GET") return sendJson(response, 200, remote.view());
@@ -466,6 +487,11 @@ export function createApp(
           }
         }
         if (request.method === "GET") return sendJson(response, 200, { installed: settings.plugins() });
+      }
+      if (settings && request.method === "POST" && url.pathname === "/api/settings/reset") {
+        settings.forgetLanguage();
+        remote?.reset();
+        return sendJson(response, 200, { ...settings.read(), status: settings.status(), host: os.hostname(), capabilities: supervisor.capabilities() });
       }
       if (settings && url.pathname === "/api/settings") {
         if (request.method === "PUT") {

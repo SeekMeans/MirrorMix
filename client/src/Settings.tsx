@@ -18,6 +18,7 @@ import {
   StoreIcon,
 } from "./icons";
 import { RemotePanel } from "./Remote";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { ToolIcon } from "./ToolIcon";
 import { toolName } from "./text";
 import { PLUGINS, PluginMarket, type PluginId } from "./Plugins";
@@ -86,6 +87,7 @@ export function SettingsDialog({
   startAt,
   onToggle,
   onLanguageChange,
+  onRestoreDefaults,
   onCheck,
   onClose,
 }: {
@@ -110,6 +112,8 @@ export function SettingsDialog({
   startAt?: Section | MenuPage;
   onToggle: (tool: ToolId, shown: boolean) => void;
   onLanguageChange: (language: "zh-CN" | "en") => void;
+  /** Clears remote access on this computer and the saved language. Appearance is reset here, in this browser. */
+  onRestoreDefaults?: () => Promise<void>;
   onCheck: () => void;
   onClose: () => void;
 }) {
@@ -117,6 +121,10 @@ export function SettingsDialog({
   const notes = toolNote();
   const closeButton = useRef<HTMLButtonElement>(null);
   const [theme, setTheme] = useTheme();
+  const [restoring, setRestoring] = useState(false);
+  const [restoreError, setRestoreError] = useState("");
+  /** The restore-defaults confirmation is open. */
+  const [confirmRestore, setConfirmRestore] = useState(false);
   const [section, setSection] = useState<Section>(startAt && ["tools", "remote", "models", "market"].includes(startAt) ? startAt as Section : "general");
   const page = variant === "page";
 
@@ -238,6 +246,52 @@ export function SettingsDialog({
     </>
   );
 
+  /** Opens the in-page confirmation; the restore itself runs from there. */
+  const restoreDefaults = () => {
+    setRestoreError("");
+    setConfirmRestore(true);
+  };
+
+  const doRestore = async () => {
+    setRestoring(true);
+    setRestoreError("");
+    try {
+      await onRestoreDefaults?.();
+      setTheme("system");
+      setConfirmRestore(false);
+    } catch {
+      setRestoreError(tr("没有恢复成默认，请再试一次。", "Could not restore the defaults. Please try again."));
+    } finally {
+      setRestoring(false);
+    }
+  };
+
+  const restoreDialog = confirmRestore && (
+    <ConfirmDialog
+      title={tr("恢复默认设置？", "Restore the defaults?")}
+      confirmLabel={tr("恢复默认", "Restore defaults")}
+      busyLabel={tr("正在恢复", "Restoring")}
+      danger
+      busy={restoring}
+      error={restoreError}
+      onConfirm={() => void doRestore()}
+      onCancel={() => {
+        setConfirmRestore(false);
+        setRestoreError("");
+      }}
+    >
+      <p>{tr("外网访问开着的话会立即断开，从外网打开这台电脑要重新设置。", "If remote access is on, it disconnects at once; reaching this computer from outside has to be set up again.")}</p>
+      <dl className="confirm-list">
+        <dt>{tr("会清掉", "Cleared")}</dt>
+        <dd>{tr("外网访问：绑定的地址、连接口令、访问密码和申请记录", "Remote access: the bound address, connection token, access password and applications")}</dd>
+        <dd>{tr("语言改回跟随浏览器，外观改回跟随系统", "Language follows the browser again, appearance follows the system")}</dd>
+        <dt>{tr("保持不变", "Kept")}</dt>
+        <dd>{tr("已选择的 AI 工具和插件", "The AI tools and plugins you chose")}</dd>
+      </dl>
+      <p className="confirm-hint">{tr("连接口令清掉后，要从申请记录或管理员那里重新拿到才能绑定。", "Once the connection token is cleared, you need it again (from your records or the administrator) to bind.")}</p>
+    </ConfirmDialog>
+  );
+
   const languageLabel = tr("语言", "Language");
   /** The language buttons; `on` is the selected class of the container they sit in. */
   const languageButtons = (on: string) =>
@@ -280,16 +334,23 @@ export function SettingsDialog({
         </div>
       </div>
     </div>
+    <div className="setting is-inline-control">
+      <div className="setting-label">
+        <h3>{tr("恢复默认", "Restore defaults")}</h3>
+        <p>{tr("清掉这台电脑上保存的外网访问配置，语言改回跟随浏览器，外观改回跟随系统。", "Clears the remote access saved on this computer. Language follows the browser again, and appearance follows the system.")}</p>
+      </div>
+      <div className="setting-control">
+        <button type="button" className="quiet-button" disabled={restoring} onClick={restoreDefaults}>
+          {restoring && <Spinner />}
+          {restoring ? tr("正在恢复", "Restoring") : tr("恢复默认", "Restore defaults")}
+        </button>
+      </div>
+    </div>
     </>
   );
 
   const remote = (
     <div className="setting is-stacked">
-      {!page && (
-        <div className="setting-label">
-          <h3>{tr("外网访问", "Remote access")}</h3>
-        </div>
-      )}
       <RemotePanel />
     </div>
   );
@@ -353,6 +414,7 @@ export function SettingsDialog({
         </header>
         <div className="settings-body">
           {error && <p className="banner is-warning">{error}</p>}
+          {restoreDialog}
 
           {/* This computer first: what the phone is driving, whether its AI tools are up, and the way out. */}
           <section className="me-card" aria-label={tr("这台电脑", "This computer")}>
@@ -417,6 +479,10 @@ export function SettingsDialog({
               <span className="pref-title">{PAGES().remote.title}</span>
               <span className="pref-value">{summary.remote}</span>
               <span className="pref-caret"><ChevronIcon /></span>
+            </button>
+            <button type="button" className="pref-row" disabled={restoring} onClick={restoreDefaults}>
+              <span className="pref-title">{tr("恢复默认", "Restore defaults")}</span>
+              <span className="pref-value">{restoring ? tr("正在恢复", "Restoring") : ""}</span>
             </button>
           </div>
 
@@ -508,6 +574,7 @@ export function SettingsDialog({
         if (event.target === event.currentTarget) onClose();
       }}
     >
+      {restoreDialog}
       <section className="settings" role="dialog" aria-modal="true" aria-labelledby="settings-title">
         <nav className="settings-nav" aria-label={tr("设置分类", "Settings sections")}>
           <div className="brand">

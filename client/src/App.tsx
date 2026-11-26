@@ -183,6 +183,11 @@ export function App({ onLogout }: { onLogout?: () => void }) {
     if (currentLanguage() !== next) void setLanguage(next);
   }, [prefs]);
 
+  const restoreDefaults = useCallback(async () => {
+    setPrefs(await api.resetSettings());
+    setSettingsError("");
+  }, []);
+
   const changeLanguage = useCallback(async (language: "zh-CN" | "en") => {
     const before = currentLanguage();
     await setLanguage(language);
@@ -1024,6 +1029,7 @@ export function App({ onLogout }: { onLogout?: () => void }) {
           startAt={settingsStart}
           onToggle={toggleTool}
           onLanguageChange={(language) => void changeLanguage(language)}
+          onRestoreDefaults={restoreDefaults}
           onCheck={() => void checkNow()}
           onClose={() => setScreen("list")}
         />
@@ -1084,6 +1090,7 @@ export function App({ onLogout }: { onLogout?: () => void }) {
           startAt={settingsStart}
           onToggle={toggleTool}
           onLanguageChange={(language) => void changeLanguage(language)}
+          onRestoreDefaults={restoreDefaults}
           onCheck={() => void checkNow()}
           onClose={closeSettings}
         />

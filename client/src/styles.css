@@ -2628,6 +2628,117 @@ body.is-resizing-x iframe { pointer-events: none; }
 .remote-fields input::placeholder { color: var(--faint); }
 
 .remote-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+
+/* 外网访问：向 DNSMgr 申请的地址，和绑定的微信 */
+.remote-app { display: grid; gap: 10px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.remote-app-head { display: flex; align-items: center; gap: 10px; }
+.remote-app-label { flex: 1; color: var(--muted); font-size: 12.5px; }
+.remote-badge { padding: 1px 9px; border-radius: 999px; background: var(--line-soft); color: var(--muted); font-size: 12px; line-height: 20px; }
+.remote-badge.is-pending { background: var(--amber-soft); color: var(--amber); }
+.remote-badge.is-ready { background: var(--signal-soft); color: var(--signal); }
+.remote-badge.is-rejected { background: color-mix(in srgb, #c4472f 12%, var(--surface)); color: #c4472f; }
+.remote-app-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; min-width: 0; }
+.remote-app-line code { font-family: var(--mono); font-size: 14px; color: var(--ink); overflow-wrap: anywhere; }
+.remote-apply { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.remote-apply .remote-suffix { flex: 1 1 260px; }
+.remote-apply input { width: 100%; height: 36px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); font-size: 14px; }
+.remote-apply input:focus { outline: 2px solid var(--signal); outline-offset: 0; border-color: transparent; }
+.remote-apply .quiet-button { height: 36px; }
+.remote-message.is-warning { color: var(--amber); }
+.remote-slug { display: grid; gap: 5px; max-width: 420px; min-width: 0; color: var(--muted); font-size: 12.5px; }
+.remote-slug input { width: 100%; min-width: 0; height: 36px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); font-size: 14px; }
+.remote-slug input:focus { outline: 2px solid var(--signal); outline-offset: 0; border-color: transparent; }
+.remote-slug input::placeholder { color: var(--faint); }
+.remote-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.remote-row .quiet-button { height: 34px; }
+.remote-hint { color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+.remote-badge.is-none { background: var(--line-soft); color: var(--muted); }
+.remote-apply-block { display: grid; gap: 10px; padding-top: 6px; }
+.remote-records { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.remote-records li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px 12px; padding: 11px 14px; background: var(--surface); }
+.remote-records li + li { border-top: 1px solid var(--line-soft); }
+.remote-records li > .remote-message, .remote-record-token { grid-column: 1 / -1; }
+.remote-record-main { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-width: 0; }
+.remote-record-main code { font-family: var(--mono); font-size: 13.5px; color: var(--ink); overflow-wrap: anywhere; }
+.remote-record-token { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; color: var(--muted); font-size: 12.5px; }
+/* 页面里的确认框（代替浏览器自带的 confirm），叠在设置之上 */
+.confirm-backdrop { position: fixed; z-index: 90; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(15, 31, 38, 0.46); animation: confirm-fade 140ms ease-out; }
+.confirm-card { width: min(440px, 100%); display: grid; gap: 14px; padding: 22px 22px 18px; border-radius: 14px; background: var(--surface); color: var(--ink); box-shadow: var(--shadow); animation: confirm-rise 160ms ease-out; }
+.confirm-card h3 { margin: 0; font-size: 17px; font-weight: 650; line-height: 1.35; }
+.confirm-body { display: grid; gap: 12px; color: var(--ink); font-size: 13.5px; line-height: 1.6; }
+.confirm-body p { margin: 0; }
+.confirm-hint { color: var(--muted); font-size: 12.5px; }
+.confirm-list { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; margin: 0; padding: 12px 14px; border-radius: 10px; background: var(--page); }
+.confirm-list dt { grid-column: 1; color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+.confirm-list dd { grid-column: 2; margin: 0; }
+.confirm-list dt:not(:first-child), .confirm-list dt:not(:first-child) + dd { margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--line-soft); }
+.confirm-error { margin: 0; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, #c4472f 10%, var(--surface)); color: #c4472f; font-size: 13px; }
+.confirm-actions { display: flex; justify-content: flex-end; gap: 10px; padding-top: 2px; }
+.confirm-actions .quiet-button { height: 34px; padding: 0 14px; }
+.confirm-actions .quiet-button:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+@keyframes confirm-fade { from { opacity: 0; } }
+@keyframes confirm-rise { from { opacity: 0; transform: translateY(6px) scale(0.98); } }
+@media (prefers-reduced-motion: reduce) { .confirm-backdrop, .confirm-card { animation: none; } }
+@media (max-width: 760px) {
+  .confirm-backdrop { place-items: end stretch; padding: 0; }
+  .confirm-card { width: 100%; border-radius: 16px 16px 0 0; padding: 20px 18px calc(16px + env(safe-area-inset-bottom)); }
+  .confirm-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .confirm-actions .quiet-button { height: 44px; justify-content: center; font-size: 15px; }
+}
+
+/* 访问密码：状态框里的最后一行，和连接状态放在一起 */
+.remote-access { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--line-soft); font-size: 13px; }
+.remote-access-label { color: var(--muted); }
+.remote-access-value { flex: 1; display: inline-flex; align-items: center; gap: 8px; min-width: 0; color: var(--ink); }
+.remote-access-value.is-missing { color: var(--amber); }
+.remote-access-dots { color: var(--muted); letter-spacing: 1px; }
+.remote-access.is-missing { margin-left: -16px; margin-right: -16px; margin-bottom: -14px; padding: 12px 16px 14px; border-radius: 0 0 10px 10px; background: var(--amber-soft); border-top-color: color-mix(in srgb, var(--amber) 25%, transparent); }
+.remote-access.is-editing { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px 12px; }
+.remote-access-field { display: grid; gap: 5px; min-width: 0; color: var(--muted); font-size: 12.5px; }
+.remote-access-field input { width: 100%; min-width: 0; height: 36px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); font-size: 14px; }
+.remote-access-field input:focus { outline: 2px solid var(--signal); outline-offset: 0; border-color: transparent; }
+.remote-access-field input[aria-invalid="true"] { border-color: #c4472f; }
+.remote-access-actions { display: flex; align-items: center; gap: 12px; }
+.remote-access-actions .quiet-button { height: 36px; }
+.remote-access-note { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.55; }
+.remote-access-note.is-error { color: #c4472f; }
+@media (max-width: 760px) {
+  .remote-access.is-editing { grid-template-columns: minmax(0, 1fr); }
+  .remote-access-field input, .remote-access-actions .quiet-button { height: 44px; font-size: 16px; }
+}
+.remote-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px 12px; }
+.remote-pair .remote-slug { max-width: none; }
+.remote-keep { flex-basis: 100%; margin: 2px 0 0; padding: 8px 10px; border-radius: 6px; background: var(--amber-soft); color: var(--amber); font-size: 12.5px; line-height: 1.55; }
+.remote-record-token code { font-family: var(--mono); color: var(--ink); overflow-wrap: anywhere; user-select: all; }
+@media (max-width: 760px) {
+  .remote-slug { max-width: none; }
+  .remote-pair { grid-template-columns: minmax(0, 1fr); }
+  .remote-slug input { height: 44px; font-size: 16px; }
+}
+.remote-wechat { display: flex; align-items: center; gap: 12px; padding-top: 10px; border-top: 1px solid var(--line-soft); }
+.remote-wechat-button { flex: none; display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 12px; border: 1px solid var(--signal); border-radius: 8px; background: var(--signal-soft); color: var(--signal); font-size: 13px; font-weight: 600; cursor: pointer; }
+.remote-wechat-button:hover { filter: brightness(0.97); }
+.remote-wechat-button:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.remote-wechat-state { min-width: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+
+.remote-bind-backdrop { z-index: 80; }
+.remote-bind { width: min(380px, 100%); display: grid; gap: 12px; padding: 18px 20px 20px; border-radius: 14px; background: var(--surface); box-shadow: var(--shadow); }
+.remote-bind header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.remote-bind h3 { margin: 0; font-size: 16px; }
+.remote-bind header .remote-eye { width: 32px; height: 32px; border: 0; border-radius: 6px; }
+.remote-bind > p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.remote-bind-code { position: relative; display: grid; place-items: center; gap: 10px; min-height: 236px; padding: 8px; border-radius: 10px; background: #ffffff; }
+.remote-bind-code img { display: block; width: 220px; height: 220px; }
+.remote-bind-code.is-expired img { opacity: 0.15; }
+.remote-bind-code.is-expired .quiet-button { position: absolute; }
+.remote-bind-done { display: grid; justify-items: center; gap: 10px; color: var(--signal); font-size: 15px; }
+.remote-bind-fallback { display: grid; gap: 8px; max-width: 280px; color: #5b6472; font-size: 13px; line-height: 1.55; text-align: center; }
+.remote-bind-fallback code { font-family: var(--mono); color: #14181f; user-select: all; overflow-wrap: anywhere; }
+.remote-bind-foot { display: flex; justify-content: space-between; align-items: center; margin: 0; color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+@media (max-width: 760px) {
+  .remote-apply input, .remote-apply .quiet-button { height: 44px; font-size: 16px; }
+  .remote-wechat { align-items: flex-start; flex-direction: column; }
+}
 @media (max-width: 760px) {
   .remote-fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .remote-fields label:first-child { grid-column: 1 / -1; }

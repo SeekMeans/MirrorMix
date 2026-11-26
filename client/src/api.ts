@@ -189,6 +189,42 @@ export interface RemoteView extends RemoteConfig {
   hasAccessPassword?: boolean;
   /** `retryAt`: when the server tries again by itself (ms since 1970), while it is not connected. */
   status: { state: "off" | "starting" | "connected" | "error"; message: string; url: string; retryAt?: number };
+  /** The address this PC is bound to (by its subdomain), and the WeChat account bound to it. */
+  binding: RemoteBinding;
+  /** Applications sent from this PC, newest first. */
+  applications: RemoteApplication[];
+}
+
+export interface RemoteBinding {
+  bound: boolean;
+  slug: string;
+  wechat: boolean;
+  nickname: string;
+  boundAt?: number;
+  /** DNSMgr could not be reached, refused, or said the token no longer works. */
+  error?: string;
+}
+
+export interface RemoteApplication {
+  slug: string;
+  status: "pending" | "ready" | "rejected";
+  message: string;
+  submittedAt: number;
+  checkedAt?: number;
+  /** This PC is bound to this address. */
+  current?: boolean;
+  /** Approved and the token is kept here: show it (eye button) for the person to keep safe. */
+  hasToken?: boolean;
+  /** Approved, but binding it to this PC was refused. */
+  bindError?: string;
+}
+
+/** The mini program code for 绑定微信: `image` is base64 (empty when DNSMgr could not make one). */
+export interface RemoteBindCode {
+  image: string;
+  ticket: string;
+  expiresIn: number;
+  imageError?: string;
 }
 
 export const AUTH_EXPIRED = "mirrormix:auth-expired";
@@ -224,9 +260,12 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   });
   const body = (await response.json()) as T & { error?: string };
   if (!response.ok) {
-    const error = new Error(body.error ?? "failed") as Error & { code?: string; status?: number };
+    const error = new Error(body.error ?? "failed") as Error & { code?: string; status?: number; detail?: string };
     error.code = body.error;
     error.status = response.status;
+    // The server's own words, when it gave some (DNSMgr's reasons for the address application).
+    const detail = (body as { message?: unknown }).message;
+    if (typeof detail === "string" && detail) error.detail = detail;
     throw error;
   }
   return body;
@@ -325,6 +364,12 @@ function keepPrefs(text: string): ToolPrefs {
 
 async function settings(): Promise<ToolPrefs> {
   const response = await authenticatedFetch("/api/settings");
+  if (!response.ok) throw new Error("failed");
+  return keepPrefs(await response.text());
+}
+
+async function resetSettings(): Promise<ToolPrefs> {
+  const response = await authenticatedFetch("/api/settings/reset", { method: "POST" });
   if (!response.ok) throw new Error("failed");
   return keepPrefs(await response.text());
 }
@@ -432,6 +477,7 @@ export const api = {
   catalog,
   settings,
   saveSettings,
+  resetSettings,
   schedules: () => request<ScheduleJob[]>("/api/schedules"),
   /** The plugins added from the plugin market. */
   plugins: () => request<{ installed: string[] }>("/api/plugins"),
@@ -439,8 +485,12 @@ export const api = {
     request<{ installed: string[] }>("/api/plugins", { method: "PUT", body: JSON.stringify({ installed }) }),
   remote: () => request<RemoteView>("/api/remote"),
   /** The saved connection token in plain text, for the eye button only. */
-  remoteToken: () => request<{ token: string }>("/api/remote/token"),
+  remoteToken: (slug?: string) => request<{ token: string }>(`/api/remote/token${slug ? `?slug=${encodeURIComponent(slug)}` : ""}`),
   retryRemote: () => request<RemoteView>("/api/remote/retry", { method: "POST" }),
+  applyRemote: (subdomain: string) => request<RemoteView>("/api/remote/apply", { method: "POST", body: JSON.stringify({ subdomain }) }),
+  bindRemote: (subdomain: string, token: string) => request<RemoteView>("/api/remote/bind", { method: "POST", body: JSON.stringify({ subdomain, token }) }),
+  refreshRemote: () => request<RemoteView>("/api/remote/refresh", { method: "POST" }),
+  remoteBindCode: () => request<RemoteBindCode>("/api/remote/bind-code", { method: "POST" }),
   saveRemote: (change: Partial<RemoteConfig> & { token?: string; accessPassword?: string }) =>
     request<RemoteView>("/api/remote", { method: "PUT", body: JSON.stringify(change) }),
   page: (tool: ToolId, id: string, before: number, limit: number) =>

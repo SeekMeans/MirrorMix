@@ -64,6 +64,8 @@ function cleanLanguage(value: unknown): Language | null {
 export interface SettingsStore {
   read(): ToolSettings;
   write(value: unknown): ToolSettings;
+  /** Drops a chosen interface language so the page follows the browser again. Tools and pins stay. */
+  forgetLanguage(): ToolSettings;
   status(): Record<ToolId, ToolStatus>;
   /** A tool can be used when it is chosen in settings and its app is open. */
   usable(tool: ToolId): boolean;
@@ -128,6 +130,13 @@ export function createSettingsStore(file: string, listProcesses: () => ProcessIn
       if (!existsSync(path.dirname(file))) mkdirSync(path.dirname(file), { recursive: true });
       writeFileSync(file, `${JSON.stringify(next, null, 2)}
 `);
+      return next;
+    },
+    forgetLanguage() {
+      const current = read();
+      const next: ToolSettings = { tools: current.tools, pinned: current.pinned };
+      if (!existsSync(path.dirname(file))) mkdirSync(path.dirname(file), { recursive: true });
+      writeFileSync(file, `${JSON.stringify(next, null, 2)}\n`);
       return next;
     },
     status,

@@ -24,6 +24,58 @@ export interface RemoteServer {
   serverPort: number;
   /** The domain the server answers under (frps subDomainHost). Each PC is <subdomain>.<domain> on port 443. */
   domain: string;
+  /** DNSMgr: where this PC applies for its address, learns when it is approved and fetches its connection token. */
+  api: string;
+}
+
+/** Where an application for an address stands, as DNSMgr last said. */
+export type ApplicationStatus = "pending" | "ready" | "rejected";
+
+/** One application this PC sent for a subdomain. Kept on this PC as its 申请记录. */
+export interface RemoteApplication {
+  slug: string;
+  status: ApplicationStatus;
+  /** Why it was turned down. */
+  message: string;
+  /** When it was sent (ms since 1970). */
+  submittedAt: number;
+  /** When DNSMgr was last asked (ms since 1970). */
+  checkedAt?: number;
+  /** This PC is bound to this address now. */
+  current?: boolean;
+  /** Approved, and the connection token came with it: the record shows it (through the eye button) to keep safe. */
+  hasToken?: boolean;
+  /** Approved, but binding it to this PC did not work (another PC is connected to it, for one). */
+  bindError?: string;
+}
+
+/** A record as kept on disk: the key this PC applied with and the token it got, both encrypted. Never sent to the page. */
+interface StoredApplication extends RemoteApplication {
+  /** Generated here when applying; DNSMgr keeps only its hash and hands the token to whoever shows it once approved. */
+  sealedKey?: string;
+  sealedToken?: string;
+}
+
+/** This PC's address: bound with its subdomain and connection token. */
+export interface RemoteBinding {
+  /** Bound: a token is saved and DNSMgr has not said it stopped working. */
+  bound: boolean;
+  slug: string;
+  /** A WeChat account has scanned this PC's code; it opens this PC straight from the mini program. */
+  wechat: boolean;
+  nickname: string;
+  /** When the WeChat account was bound (s since 1970). Changes when another account binds instead. */
+  boundAt?: number;
+  /** DNSMgr could not be reached, turned the last request down, or said the token no longer works. */
+  error?: string;
+}
+
+/** The mini program code shown for 绑定微信. `image` is a PNG/JPEG as base64, empty when DNSMgr could not make one. */
+export interface BindCode {
+  image: string;
+  ticket: string;
+  expiresIn: number;
+  imageError?: string;
 }
 
 export type RemoteState = "off" | "starting" | "connected" | "error";
@@ -46,6 +98,10 @@ export interface RemoteView extends RemoteConfig, RemoteServer {
   /** An access password is set: what someone coming in through the public address signs in with. */
   hasAccessPassword: boolean;
   status: RemoteStatus;
+  /** The address this PC is bound to. */
+  binding: RemoteBinding;
+  /** Applications sent from this PC, newest first. */
+  applications: RemoteApplication[];
 }
 
 /** What the page may send. The token is only written when a new one is given. */
@@ -60,6 +116,36 @@ interface Stored extends RemoteConfig {
   sealedToken: string;
   /** The access password as "scrypt:<salt>:<hash>"; the password itself is never kept. */
   accessHash?: string;
+  /** The WeChat account bound to the address, as DNSMgr last said. */
+  wechat?: { bound: boolean; nickname: string; boundAt?: number };
+  /** DNSMgr said the saved token no longer works (reset, bound by another PC, or the address taken back). */
+  tokenDead?: string;
+  /** Applications sent from this PC. */
+  applications?: StoredApplication[];
+  /** The frps this address was assigned to, when DNSMgr says one; otherwise the server from mirrormix.config.json. */
+  assigned?: { server: string; serverPort: number };
+}
+
+/** What DNSMgr answered: HTTP status and the JSON body ({} when there was none). */
+export interface ApiResponse {
+  status: number;
+  body: Record<string, unknown>;
+}
+
+async function postJson(url: string, body: unknown): Promise<ApiResponse> {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(10_000),
+  });
+  let parsed: unknown = {};
+  try {
+    parsed = await response.json();
+  } catch {
+    parsed = {};
+  }
+  return { status: response.status, body: parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {} };
 }
 
 export const ACCESS_PASSWORD_MIN = 6;
@@ -102,15 +188,24 @@ export interface TunnelDeps {
   unseal?: (sealed: string) => string;
   /** Waits before starting frpc again after it stopped. */
   retryMs?: (attempt: number) => number;
+  /** Talks to DNSMgr. Defaults to fetch. */
+  post?: (url: string, body: unknown) => Promise<ApiResponse>;
+  /** How long to wait before asking DNSMgr again: "pending" while an application is under review, "ready" while bound. 0 or less: not on its own. */
+  pollMs?: (status: ApplicationStatus) => number;
 }
 
 export class RemoteError extends Error {
-  constructor(public code: string) {
-    super(code);
+  /** `message` is DNSMgr's own words, when it gave some. */
+  constructor(
+    public code: string,
+    message = "",
+  ) {
+    super(message || code);
   }
 }
 
-export const DEFAULT_SERVER: RemoteServer = { server: "seekmeans.cn", serverPort: 5000, domain: "mm.seekmeans.cn" };
+export const DEFAULT_SERVER: RemoteServer = { server: "seekmeans.cn", serverPort: 5000, domain: "mm.seekmeans.cn", api: "https://dns.seekmeans.cn" };
+const API = /^https?:\/\/[a-z0-9.\-:[\]]{1,253}$/i;
 const SUBDOMAIN = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 const HOST = /^[a-z0-9.\-:[\]]{1,253}$/i;
 const DOMAIN = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
@@ -144,6 +239,11 @@ export function loadRemoteServer(file: string): { server: RemoteServer; problems
     const value = String(remote.domain).trim().toLowerCase();
     if (DOMAIN.test(value)) server.domain = value;
     else problems.push(`remote.domain "${value}" is not a domain.`);
+  }
+  if (remote.api !== undefined) {
+    const value = String(remote.api).trim().replace(/\/+$/, "");
+    if (API.test(value)) server.api = value;
+    else problems.push(`remote.api "${value}" is not an http(s) address like https://dns.seekmeans.cn.`);
   }
   return { server, problems };
 }
@@ -179,12 +279,12 @@ export function previewSubdomain(subdomain: string): string | null {
 
 /**
  * The frpc config, token included. Each PC logs in as its own frp user: the user is the subdomain
- * and the token is the one issued for it when the address was approved in the MirrorMix mini program.
+ * and the token is the one DNSMgr issued when the address this PC applied for was approved.
  * The server's auth plugin checks the pair and only lets this user register <subdomain> and
  * <subdomain>-preview. frpc 0.61 sent a wrong token when it was given as an {{ .Envs.X }} template,
  * so the token is written in plain; the file only lives until frpc has read it.
  */
-export function frpcConfig(config: RemoteConfig & RemoteServer, localPort: number, token: string, previewPort?: number): string {
+export function frpcConfig(config: RemoteConfig & Omit<RemoteServer, "api">, localPort: number, token: string, previewPort?: number): string {
   const preview = previewPort ? previewSubdomain(config.subdomain) : null;
   return [
     `serverAddr = ${tomlString(config.server)}`,
@@ -225,10 +325,10 @@ export function readFrpcLine(line: string): { state: RemoteState; message: strin
   if (!text) return null;
   if (/start proxy success/i.test(text)) return { state: "connected", message: "" };
   if (/not granted/i.test(text)) {
-    return { state: "error", message: "这个子域名没有分配给你的连接口令。子域名要和小程序里开通的地址一致。" };
+    return { state: "error", message: "这个子域名没有分配给这台电脑的连接口令，正在向服务器重新取口令。" };
   }
   if (/token|authorization/i.test(text) && /(fail|invalid|mismatch|error)/i.test(text)) {
-    return { state: "error", message: "服务器拒绝了连接口令。检查子域名和连接口令是否和 MirrorMix 小程序里显示的一致。" };
+    return { state: "error", message: "服务器拒绝了连接口令，可能被管理员重置或收回了。正在向服务器重新取口令。" };
   }
   // frps still has this proxy from another connection: another computer using the same subdomain, or an old link
   // the server has not noticed is gone. frpc keeps trying, so it connects by itself once that one is released.
@@ -308,12 +408,23 @@ export interface Tunnel {
   origin(): string | null;
   /** Where local pages are shown through the tunnel, while it is on. */
   previewOrigin(): string | null;
-  /** The saved connection token in plain text, or null when none is saved or it cannot be read. */
-  token(): string | null;
+  /** The saved connection token in plain text, or null when none is saved or it cannot be read.
+   * With a subdomain: the token kept in that application record. */
+  token(slug?: string): string | null;
   /** Whether an access password is set. */
   hasAccessPassword(): boolean;
   /** Whether this is the access password. False while none is set. */
   checkAccess(password: string): boolean;
+  /** Applies to DNSMgr for <subdomain>.<domain>; the subdomain is the one key. The application shows in this PC's records. */
+  apply(subdomain: string): Promise<RemoteView>;
+  /** Binds this PC to an approved address with its subdomain and connection token; DNSMgr refuses while another PC is connected to it. */
+  bind(subdomain: string, token: string): Promise<RemoteView>;
+  /** Asks DNSMgr how the applications under review and this PC's address stand now. */
+  refresh(): Promise<RemoteView>;
+  /** Forgets remote access on this PC: the tunnel stops, and the address, token and access password are cleared. */
+  reset(): RemoteView;
+  /** A fresh mini program code that binds a WeChat account to this PC's address when scanned. */
+  bindCode(): Promise<BindCode>;
   dispose(): void;
 }
 
@@ -338,6 +449,10 @@ export function createTunnel(deps: TunnelDeps): Tunnel {
   const seal = deps.seal ?? dpapiSeal;
   const unseal = deps.unseal ?? dpapiUnseal;
   const retryMs = deps.retryMs ?? ((attempt: number) => Math.min(30_000, 2_000 * 2 ** attempt));
+  const post = deps.post ?? postJson;
+  // An application under review: every 15 s, so it binds soon after approval. Bound: every 2 min, to notice a token
+  // that was reset, a WeChat account that was bound, or an address that was taken back.
+  const pollMs = deps.pollMs ?? ((state: ApplicationStatus) => (state === "pending" ? 15_000 : state === "ready" ? 120_000 : 0));
   const shared: RemoteServer = deps.server ?? DEFAULT_SERVER;
   const bundledFrpc = () => {
     const file = deps.bundledFrpc;
@@ -404,10 +519,16 @@ export function createTunnel(deps: TunnelDeps): Tunnel {
   const frpcBinary = (): string | null => bundledFrpc();
 
   const missing = (): string => {
-    if (!stored.subdomain) return "还没有填子域名。";
-    if (!stored.sealedToken) return "还没有填连接口令。";
+    if (stored.tokenDead) return stored.tokenDead;
+    if (!stored.sealedToken || !stored.subdomain) {
+      if ((stored.applications ?? []).some((record) => record.status === "pending")) return "申请还在审核，通过后会自动绑定并连上。";
+      return "还没有绑定地址。用域名标识和连接口令绑定。";
+    }
     return "";
   };
+
+  /** The frps to connect to: the one DNSMgr assigned, or the shared one from mirrormix.config.json. */
+  const frpsServer = (): RemoteServer => (stored.assigned ? { ...shared, ...stored.assigned } : shared);
 
   const start = () => {
     stop();
@@ -435,7 +556,7 @@ export function createTunnel(deps: TunnelDeps): Tunnel {
     if (!existsSync(deps.dir)) mkdirSync(deps.dir, { recursive: true });
     const mine = ++generation;
     const runFile = path.join(deps.dir, `frpc-run-${process.pid}-${mine}.toml`);
-    writeFileSync(runFile, frpcConfig({ ...stored, ...shared }, deps.localPort, token, deps.previewPort), { mode: 0o600 });
+    writeFileSync(runFile, frpcConfig({ ...stored, ...frpsServer() }, deps.localPort, token, deps.previewPort), { mode: 0o600 });
     // frpc reads its config once, before it prints anything. Remove the file at its first line,
     // when it stops, or after a while in case it never says a word.
     let removed = false;
@@ -472,6 +593,8 @@ export function createTunnel(deps: TunnelDeps): Tunnel {
       if (change.state === "starting" && status.state === "connected") return;
       setStatus(change.state, change.message);
       if (change.state === "error") scheduleRetry(mine);
+      // The token was reset or the address taken back: ask DNSMgr for the current one.
+      if (change.state === "error" && /口令/.test(change.message)) tokenRejected();
     });
     proc.onExit(() => {
       forget();
@@ -487,15 +610,325 @@ export function createTunnel(deps: TunnelDeps): Tunnel {
   };
 
   const view = (): RemoteView => {
-    const { sealedToken, accessHash, ...config } = stored;
+    const { sealedToken, accessHash, wechat, tokenDead, applications, assigned: _a, ...config } = stored;
+    const bound = Boolean(sealedToken && stored.subdomain && !tokenDead);
     return {
       ...config,
-      ...shared,
+      ...frpsServer(),
       configFile: deps.configFile ?? "",
       hasToken: Boolean(sealedToken),
       hasAccessPassword: Boolean(accessHash),
       status: { ...status, url: urlOf(stored), ...(retryAt && status.state !== "connected" ? { retryAt } : {}) },
+      binding: {
+        bound,
+        slug: stored.subdomain,
+        wechat: Boolean(bound && wechat?.bound),
+        nickname: bound ? wechat?.nickname ?? "" : "",
+        ...(bound && wechat?.boundAt ? { boundAt: wechat.boundAt } : {}),
+        ...(tokenDead || apiError ? { error: tokenDead || apiError } : {}),
+      },
+      applications: (applications ?? []).map(({ sealedKey: _k, sealedToken: recordToken, ...record }) => {
+        const current = bound && record.status === "ready" && record.slug === stored.subdomain;
+        return { ...record, current, hasToken: record.status === "ready" && Boolean(recordToken || current) };
+      }),
     };
+  };
+
+  // ---- Applying for an address and binding this PC to it, with DNSMgr ----
+
+  let apiError = "";
+  let poll: NodeJS.Timeout | null = null;
+  /** Bumped when remote access is restored to defaults, so a request already in flight cannot write the old address back. */
+  let epoch = 0;
+  let lastTokenCheck = 0;
+  let disposed = false;
+  /** One DNSMgr conversation at a time, so a poll cannot undo a binding made a moment later. */
+  let queue: Promise<unknown> = Promise.resolve();
+  const serial = <T>(work: () => Promise<T>): Promise<T> => {
+    const next = queue.then(work, work);
+    queue = next.catch(() => undefined);
+    return next;
+  };
+  /** The token in plain text as last sealed or read, so a poll does not unseal it each time. */
+  let plainToken: string | null = null;
+  const currentToken = (): string | null => {
+    if (plainToken !== null) return plainToken;
+    if (!stored.sealedToken) return null;
+    try {
+      plainToken = unseal(stored.sealedToken);
+    } catch {
+      plainToken = null;
+    }
+    return plainToken;
+  };
+
+  const records = () => stored.applications ?? [];
+  const bound = () => Boolean(stored.sealedToken && stored.subdomain && !stored.tokenDead);
+
+  const schedulePoll = () => {
+    if (poll) clearTimeout(poll);
+    poll = null;
+    if (disposed) return;
+    const wait = records().some((record) => record.status === "pending") ? pollMs("pending") : bound() ? pollMs("ready") : 0;
+    if (wait > 0) poll = setTimeout(() => void refresh().catch(() => undefined), wait);
+  };
+
+  const call = async (route: string, body: unknown): Promise<ApiResponse> => {
+    let answer: ApiResponse;
+    try {
+      answer = await post(`${shared.api}${route}`, body);
+    } catch {
+      apiError = `连不上 ${shared.api}，稍后会再试。`;
+      throw new RemoteError("api_unreachable", apiError);
+    }
+    // nginx sent the request to DNSMgr's admin page, which wants a sign-in: the server's nginx config predates these endpoints.
+    if (answer.status === 401 && answer.body.error === "login_required") {
+      apiError = `地址服务器还没开放外网访问的接口（${shared.api} 上的 nginx 配置是旧的），请服务器管理员按 DNSMgr 的说明更新 nginx 配置。`;
+      throw new RemoteError("api_outdated", apiError);
+    }
+    return answer;
+  };
+
+  const text = (value: unknown) => (typeof value === "string" ? value : "");
+  const cleanSlug = (value: string) => {
+    const slug = String(value ?? "").trim().toLowerCase();
+    if (!SUBDOMAIN.test(slug)) throw new RemoteError("bad_subdomain");
+    return slug;
+  };
+  const cleanToken = (value: string) => {
+    const token = String(value ?? "").trim();
+    if (!token) throw new RemoteError("bad_token", "请填写连接口令。");
+    if (token.length > 512) throw new RemoteError("bad_token");
+    return token;
+  };
+  const opened = (sealed?: string): string | null => {
+    if (!sealed) return null;
+    try {
+      return unseal(sealed);
+    } catch {
+      return null;
+    }
+  };
+
+  /** Keeps a record of an application, newest first, one per subdomain, at most 20. */
+  const keepRecord = (record: StoredApplication) => {
+    const others = records().filter((item) => item.slug !== record.slug);
+    stored = { ...stored, applications: [record, ...others].slice(0, 20) };
+  };
+
+  const setRecord = (slug: string, change: Partial<StoredApplication>) => {
+    stored = {
+      ...stored,
+      applications: records().map((item) => (item.slug === slug ? { ...item, ...change } : item)),
+    };
+  };
+
+  /** What DNSMgr says about this PC's address (bind or status): token, server, WeChat. Starts or restarts frpc when it changed. */
+  const absorbPc = (body: Record<string, unknown>) => {
+    const tunnel = body.tunnel as { user?: unknown; token?: unknown; server?: { host?: unknown; port?: unknown } } | undefined;
+    const next: Stored = {
+      ...stored,
+      tokenDead: undefined,
+      wechat: {
+        bound: body.bound === true,
+        nickname: text(body.nickname),
+        ...(typeof body.bound_at === "number" ? { boundAt: body.bound_at } : {}),
+      },
+    };
+    const slug = text(tunnel?.user) || text(body.slug);
+    if (SUBDOMAIN.test(slug)) next.subdomain = slug;
+    const token = text(tunnel?.token);
+    if (token && token !== currentToken()) {
+      next.sealedToken = seal(token);
+      plainToken = token;
+    }
+    const host = text(tunnel?.server?.host);
+    const port = Number(tunnel?.server?.port);
+    if (tunnel) {
+      next.assigned = host && HOST.test(host) && Number.isInteger(port) && port > 0 && port < 65536 ? { server: host, serverPort: port } : undefined;
+    }
+    const restart =
+      (["subdomain", "sealedToken"] as const).some((key) => next[key] !== stored[key]) ||
+      JSON.stringify(next.assigned) !== JSON.stringify(stored.assigned) ||
+      Boolean(stored.tokenDead);
+    stored = next;
+    apiError = "";
+    save();
+    if (restart && stored.enabled) {
+      attempts = 0;
+      start();
+    } else {
+      status = { ...status, url: urlOf(stored) };
+    }
+  };
+
+  /** DNSMgr says the token no longer works: stop, keep the subdomain so binding again is one click. */
+  const tokenGone = (message: string) => {
+    stored = { ...stored, tokenDead: message, sealedToken: "", wechat: undefined };
+    plainToken = null;
+    save();
+    if (stored.enabled) start();
+  };
+
+  /** Inside `serial`: binds this PC with a subdomain and token. Returns DNSMgr's refusal, or "" when bound. */
+  const bindNow = async (slug: string, token: string, mine: number): Promise<string> => {
+    const answer = await call("/api/site/bind", { slug, token });
+    if (mine !== epoch) return "";
+    if (answer.status !== 200) {
+      return text(answer.body.message) || `DNSMgr 返回了 ${answer.status}。`;
+    }
+    absorbPc(answer.body);
+    return "";
+  };
+
+  const refresh = (): Promise<RemoteView> =>
+    serial(async () => {
+      const mine = epoch;
+      const dropped = () => mine !== epoch;
+      try {
+        // Applications under review: ask how they stand, with the key they were sent with. Once approved the token comes
+        // back: it is kept in the record for the person to save, and binds this PC at once when it has no address yet.
+        for (const record of records().filter((item) => item.status === "pending" || (item.status === "ready" && (item.bindError || !item.sealedToken)))) {
+          const key = opened(record.sealedKey);
+          const answer = await call("/api/site/apply-status", key ? { slug: record.slug, key } : { slug: record.slug });
+          if (dropped()) return view();
+          if (answer.status === 404) {
+            setRecord(record.slug, { status: "rejected", message: "服务器上没有这条申请了", checkedAt: Date.now() });
+            continue;
+          }
+          if (answer.status !== 200) continue;
+          const state = (["pending", "ready", "rejected"] as const).find((value) => value === answer.body.status) ?? "pending";
+          const token = text(answer.body.token);
+          setRecord(record.slug, {
+            status: state,
+            message: text(answer.body.message),
+            checkedAt: Date.now(),
+            ...(token ? { sealedToken: seal(token) } : {}),
+            ...(state !== "ready" ? { sealedToken: undefined } : {}),
+          });
+          const kept = token || opened(records().find((item) => item.slug === record.slug)?.sealedToken);
+          if (state === "ready" && kept && !bound()) {
+            const refused = await bindNow(record.slug, kept, mine);
+            if (dropped()) return view();
+            setRecord(record.slug, refused ? { bindError: refused } : { bindError: undefined });
+          }
+        }
+        save();
+        // This PC's address: the WeChat account bound to it, and whether the token still works.
+        const token = currentToken();
+        if (bound() && token) {
+          const answer = await call("/api/site/status", { slug: stored.subdomain, token });
+          if (dropped()) return view();
+          if (answer.status === 401) tokenGone(text(answer.body.message) || "连接口令已经失效。拿到新口令后重新绑定。");
+          else if (answer.status === 200) absorbPc(answer.body);
+          else apiError = text(answer.body.message) || `DNSMgr 返回了 ${answer.status}。`;
+        }
+        apiError = dropped() ? "" : apiError;
+      } catch (error) {
+        if (dropped()) {
+          apiError = "";
+          return view();
+        }
+        schedulePoll();
+        throw error;
+      }
+      if (!dropped()) schedulePoll();
+      return view();
+    });
+
+  const tokenRejected = () => {
+    // frpc says so on every try; asking DNSMgr once every 30 s is enough.
+    if (!stored.sealedToken || Date.now() - lastTokenCheck < 30_000) return;
+    lastTokenCheck = Date.now();
+    void refresh().catch(() => undefined);
+  };
+
+  const apply = (subdomain: string): Promise<RemoteView> =>
+    serial(async () => {
+      const mine = epoch;
+      const slug = cleanSlug(subdomain);
+      // This PC's own key for the application: DNSMgr keeps its hash and gives the token only to whoever shows it.
+      const key = randomBytes(24).toString("base64url");
+      let answer: ApiResponse;
+      try {
+        answer = await call("/api/site/apply", { slug, key });
+      } catch (error) {
+        if (mine !== epoch) {
+          apiError = "";
+          return view();
+        }
+        throw error;
+      }
+      if (mine !== epoch) return view();
+      if (answer.status !== 200) {
+        throw new RemoteError(text(answer.body.error) || "apply_failed", text(answer.body.message));
+      }
+      const state = (["pending", "ready", "rejected"] as const).find((value) => value === answer.body.status) ?? "pending";
+      keepRecord({ slug, status: state, message: "", submittedAt: Date.now(), checkedAt: Date.now(), sealedKey: seal(key) });
+      apiError = "";
+      save();
+      if (stored.enabled && !bound()) start();
+      schedulePoll();
+      return view();
+    });
+
+  const bind = (subdomain: string, tokenInput: string): Promise<RemoteView> =>
+    serial(async () => {
+      const mine = epoch;
+      const slug = cleanSlug(subdomain);
+      const token = cleanToken(tokenInput);
+      let refused: string;
+      try {
+        refused = await bindNow(slug, token, mine);
+      } catch (error) {
+        if (mine !== epoch) {
+          apiError = "";
+          return view();
+        }
+        throw error;
+      }
+      if (mine !== epoch) return view();
+      if (refused) throw new RemoteError("bind_refused", refused);
+      if (records().some((item) => item.slug === slug)) {
+        setRecord(slug, { status: "ready", bindError: undefined, checkedAt: Date.now(), sealedToken: seal(token) });
+        save();
+      }
+      schedulePoll();
+      return view();
+    });
+
+  const bindCode = (): Promise<BindCode> =>
+    serial(async () => {
+      const token = currentToken();
+      if (!bound() || !token) throw new RemoteError("not_bound", "先用域名标识和连接口令绑定这台电脑，再绑定微信。");
+      const answer = await call("/api/site/bind-code", { slug: stored.subdomain, token });
+      if (answer.status === 401) {
+        tokenGone(text(answer.body.message) || "连接口令已经失效。拿到新口令后重新绑定。");
+        throw new RemoteError("token", stored.tokenDead ?? "");
+      }
+      if (answer.status !== 200 || typeof answer.body.ticket !== "string") {
+        throw new RemoteError(text(answer.body.error) || "bind_failed", text(answer.body.message));
+      }
+      return {
+        image: text(answer.body.image),
+        ticket: answer.body.ticket,
+        expiresIn: Number(answer.body.expires_in) || 600,
+        ...(text(answer.body.image_error) ? { imageError: text(answer.body.image_error) } : {}),
+      };
+    });
+
+  /** Stops the tunnel and writes remote.json back to a fresh install: off, this PC's name, no token or password. */
+  const reset = (): RemoteView => {
+    epoch += 1;
+    stop();
+    if (poll) clearTimeout(poll);
+    poll = null;
+    stored = { ...defaults(), sealedToken: "" };
+    plainToken = null;
+    apiError = "";
+    save();
+    setStatus("off");
+    return view();
   };
 
   /** Tries again right away (the page's 重试 button), with the waits starting over. */
@@ -517,12 +950,16 @@ export function createTunnel(deps: TunnelDeps): Tunnel {
     if (typeof change.token === "string" && change.token.trim()) {
       if (change.token.length > 512) throw new RemoteError("bad_token");
       next.sealedToken = seal(change.token.trim());
+      next.tokenDead = undefined;
+      plainToken = null;
     }
     if (typeof change.accessPassword === "string" && change.accessPassword) {
       if (change.accessPassword.length < ACCESS_PASSWORD_MIN || change.accessPassword.length > ACCESS_PASSWORD_MAX) throw new RemoteError("bad_access_password");
       next.accessHash = hashAccessPassword(change.accessPassword);
     }
     if (change.enabled !== undefined) next.enabled = Boolean(change.enabled);
+    // Switching on puts this PC on the internet: not without an access password to sign in with.
+    if (next.enabled && !stored.enabled && !next.accessHash) throw new RemoteError("access_password_required");
     const restart =
       next.enabled !== stored.enabled ||
       (next.enabled &&
@@ -539,11 +976,21 @@ export function createTunnel(deps: TunnelDeps): Tunnel {
   };
 
   if (stored.enabled) start();
+  // Catch up with DNSMgr once at startup: approved while MirrorMix was closed, a token reset, a WeChat account bound.
+  if (records().some((record) => record.status === "pending") || (stored.subdomain && stored.sealedToken)) {
+    poll = setTimeout(() => void refresh().catch(() => undefined), 1_000);
+    poll.unref?.();
+  }
 
   return {
     view,
     update,
+    reset,
     retryNow,
+    apply,
+    bind,
+    refresh,
+    bindCode,
     origin: () => (stored.enabled ? urlOf(stored) || null : null),
     previewOrigin: () => {
       const name = stored.enabled && deps.previewPort ? previewSubdomain(stored.subdomain) : null;
@@ -551,15 +998,18 @@ export function createTunnel(deps: TunnelDeps): Tunnel {
     },
     hasAccessPassword: () => Boolean(stored.accessHash),
     checkAccess: (password) => accessPasswordMatches(stored.accessHash, password),
-    token: () => {
-      if (!stored.sealedToken) return null;
-      try {
-        return unseal(stored.sealedToken);
-      } catch {
-        return null;
+    token: (slug?: string) => {
+      if (slug) {
+        const record = records().find((item) => item.slug === slug && item.status === "ready");
+        if (!record) return null;
+        return opened(record.sealedToken) ?? (bound() && record.slug === stored.subdomain ? opened(stored.sealedToken) : null);
       }
+      return opened(stored.sealedToken);
     },
     dispose: () => {
+      disposed = true;
+      if (poll) clearTimeout(poll);
+      poll = null;
       stop();
     },
   };
