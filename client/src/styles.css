@@ -5358,3 +5358,6 @@ button.pref-row:active { background: var(--rail); }
 
 /* Under the access password while none is set: nobody can sign in from outside yet. */
 .remote-fields .remote-warning { display: block; margin-top: 6px; color: var(--warn, #b45309); font-size: 12px; font-weight: 400; }
+
+/* 设置 → 统计: the workbench's figures, sized to the settings column. */
+.settings-stats .today { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }

@@ -232,6 +232,8 @@ export const TrashIcon = () => (
     <path d="M4.5 4.5 5.2 13h5.6l.7-8.5M7 7v4M9 7v4" />
   </Icon>
 );
+/** Three bars of different heights: the day's figures. */
+export const StatsIcon = () => <Icon><path d="M3 13h10" /><path d="M5 11V8" /><path d="M8 11V4" /><path d="M11 11V6.5" /></Icon>;
 export const ClockIcon = () => <Icon><circle cx="8" cy="8" r="5.5" /><path d="M8 5v3.2l2 1.3" /></Icon>;
 /**
  * Three bars rising and falling in turn: a reply is still being written. Stands in for the word “运行中”,

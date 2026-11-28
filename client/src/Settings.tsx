@@ -15,8 +15,10 @@ import {
   PuzzleIcon,
   SlidersIcon,
   Spinner,
+  StatsIcon,
   StoreIcon,
 } from "./icons";
+import { TodayStats } from "./TodayStats";
 import { RemotePanel } from "./Remote";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { ToolIcon } from "./ToolIcon";
@@ -25,7 +27,7 @@ import { PLUGINS, PluginMarket, type PluginId } from "./Plugins";
 import { THEME_LABEL, useTheme, type Theme } from "./theme";
 import { WORKFLOWS_SHOWN } from "./features";
 
-export type Section = "general" | "tools" | "remote" | "models" | "market";
+export type Section = "general" | "tools" | "stats" | "remote" | "models" | "market";
 
 const HEADINGS = (): Record<Section, { title: string; lead: string }> => ({
   general: {
@@ -33,18 +35,20 @@ const HEADINGS = (): Record<Section, { title: string; lead: string }> => ({
     lead: "",
   },
   tools: { title: tr("AI 工具", "AI tools"), lead: "" },
+  stats: { title: tr("统计", "Stats"), lead: "" },
   remote: { title: tr("外网访问", "Remote access"), lead: "" },
   models: { title: tr("模型管理", "Models"), lead: "" },
   market: { title: tr("插件市场", "Plugin market"), lead: tr("把需要的插件添加到“我的插件”，从左下角的菜单打开使用。", "Add the plugins you need to My plugins, then open them from the menu at the bottom left.") },
 });
 
 /** On a phone, settings open as a menu; each entry is a page of its own. */
-export type MenuPage = "tools" | "appearance" | "remote" | "models" | "market";
+export type MenuPage = "tools" | "stats" | "appearance" | "remote" | "models" | "market";
 
 const PAGES = (): Record<MenuPage, { title: string; lead: string; Icon: () => ReactNode }> => {
   const headings = HEADINGS();
   return {
     tools: { title: tr("AI 工具", "AI tools"), lead: "", Icon: SlidersIcon },
+    stats: { title: tr("统计", "Stats"), lead: "", Icon: StatsIcon },
     appearance: {
       title: tr("外观", "Appearance"),
       lead: tr("选择浅色或深色。只影响这个浏览器，手机和电脑可以各选各的。", "Choose light or dark. It only affects this browser, so a phone and a computer can each have their own."),
@@ -56,7 +60,7 @@ const PAGES = (): Record<MenuPage, { title: string; lead: string; Icon: () => Re
   };
 };
 
-const MENU_PAGES: MenuPage[] = ["tools", "appearance", "remote", "models", "market"];
+const MENU_PAGES: MenuPage[] = ["tools", "stats", "appearance", "remote", "models", "market"];
 
 /** Each language is named in its own words, so it can be found whichever language the page is in. */
 const LANGUAGES: { id: UiLanguage; label: string }[] = [
@@ -89,6 +93,7 @@ export function SettingsDialog({
   onLanguageChange,
   onRestoreDefaults,
   onCheck,
+  onOpenSession,
   onClose,
 }: {
   /** `page` is the phone's settings tab: a menu of sections instead of a dialog with a side list. */
@@ -115,6 +120,8 @@ export function SettingsDialog({
   /** Clears remote access on this computer and the saved language. Appearance is reset here, in this browser. */
   onRestoreDefaults?: () => Promise<void>;
   onCheck: () => void;
+  /** Opens a conversation from the stats' busiest list (and leaves settings). */
+  onOpenSession?: (tool: ToolId, id: string) => void;
   onClose: () => void;
 }) {
   const language = useLanguage();
@@ -125,7 +132,7 @@ export function SettingsDialog({
   const [restoreError, setRestoreError] = useState("");
   /** The restore-defaults confirmation is open. */
   const [confirmRestore, setConfirmRestore] = useState(false);
-  const [section, setSection] = useState<Section>(startAt && ["tools", "remote", "models", "market"].includes(startAt) ? startAt as Section : "general");
+  const [section, setSection] = useState<Section>(startAt && ["tools", "stats", "remote", "models", "market"].includes(startAt) ? startAt as Section : "general");
   const page = variant === "page";
 
   // A phone page opened from the menu is a history entry, so the back gesture returns to the menu.
@@ -357,6 +364,14 @@ export function SettingsDialog({
 
   const market = <PluginMarket installed={installed} busy={pluginBusy} onChange={onPlugin} />;
 
+  const statsTools = prefs?.tools ?? ALL_TOOLS;
+  const stats = (
+    <div className="settings-stats">
+      <TodayStats tools={statsTools} onOpen={(tool, id) => (onOpenSession ? onOpenSession(tool, id) : onClose())} />
+    </div>
+  );
+
+
   if (page) {
     /** What each menu entry says about its page before it is opened. */
     const summary: Record<MenuPage, string> = {
@@ -365,6 +380,7 @@ export function SettingsDialog({
           ? tr(`显示 ${prefs.tools.map((tool) => toolName[tool]).join("、")}`, `Shows ${prefs.tools.map((tool) => toolName[tool]).join(", ")}`)
           : tr("没有显示任何工具", "No tools shown")
         : tr("正在读取", "Loading"),
+      stats: tr("今天", "Today"),
       appearance: THEME_LABEL()[theme],
       remote: tr("从手机或别的电脑打开", "Open from a phone or another computer"),
       models: tr("工作流可以调用的模型", "Models workflows can use"),
@@ -391,7 +407,9 @@ export function SettingsDialog({
             {error && sub === "tools" && <p className="banner is-warning">{error}</p>}
             {sub === "tools"
               ? tools
-              : sub === "appearance"
+              : sub === "stats"
+                ? stats
+                : sub === "appearance"
                 ? appearance
                 : sub === "remote"
                   ? remote
@@ -474,6 +492,12 @@ export function SettingsDialog({
                 <ChevronIcon />
               </span>
             </button>
+            <button type="button" className="pref-row" onClick={() => openSub("stats")}>
+              <span className="pref-icon"><StatsIcon /></span>
+              <span className="pref-title">{PAGES().stats.title}</span>
+              <span className="pref-value">{tr("今天", "Today")}</span>
+              <span className="pref-caret"><ChevronIcon /></span>
+            </button>
             <button type="button" className="pref-row" onClick={() => openSub("remote")}>
               <span className="pref-icon"><GlobeIcon /></span>
               <span className="pref-title">{PAGES().remote.title}</span>
@@ -538,7 +562,9 @@ export function SettingsDialog({
 
   const body = (
     <div className="settings-body">
-      {section === "tools" ? (
+      {section === "stats" ? (
+        stats
+      ) : section === "tools" ? (
         <>
           {error && <p className="banner is-warning">{error}</p>}
           {tools}
@@ -583,6 +609,7 @@ export function SettingsDialog({
           </div>
           {tab("tools", ComputerIcon, tr("AI 工具", "AI tools"))}
           {tab("general", SlidersIcon, tr("通用设置", "General"))}
+          {tab("stats", StatsIcon, tr("统计", "Stats"))}
           {tab("remote", GlobeIcon, tr("外网访问", "Remote access"))}
           {WORKFLOWS_SHOWN && tab("models", ModelIcon, tr("模型管理", "Models"))}
         </nav>

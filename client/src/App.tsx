@@ -1031,6 +1031,7 @@ export function App({ onLogout }: { onLogout?: () => void }) {
           onLanguageChange={(language) => void changeLanguage(language)}
           onRestoreDefaults={restoreDefaults}
           onCheck={() => void checkNow()}
+          onOpenSession={chooseIn}
           onClose={() => setScreen("list")}
         />
       )}
@@ -1092,6 +1093,10 @@ export function App({ onLogout }: { onLogout?: () => void }) {
           onLanguageChange={(language) => void changeLanguage(language)}
           onRestoreDefaults={restoreDefaults}
           onCheck={() => void checkNow()}
+          onOpenSession={(next, id) => {
+            closeSettings();
+            chooseIn(next, id);
+          }}
           onClose={closeSettings}
         />
       )}
